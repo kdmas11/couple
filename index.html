@@ -1,124 +1,127 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Cozy Kitchen – Multiplayer</title>
+<meta charset="UTF-8">
+<title>🍰 Cozy Kitchen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
 
 <style>
-body{margin:0;background:#1e1615;color:#fff;font-family:sans-serif}
-.hidden{display:none!important}
-button{cursor:pointer}
-canvas{background:#2d2321;display:block;margin:auto}
+body {
+  background: radial-gradient(circle at top, #3a2a27, #1a1110);
+  font-family: 'Segoe UI', sans-serif;
+}
+.glass {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+}
 </style>
 </head>
 
-<body>
+<body class="min-h-screen flex items-center justify-center text-white">
 
-<div id="lobby" class="text-center p-8">
+<div id="lobby" class="glass p-8 rounded-2xl w-[340px] text-center shadow-2xl">
   <h1 class="text-4xl mb-6">🍰 Cozy Kitchen</h1>
 
-  <div id="mode">
-    <button id="hostBtn">Host</button>
-    <button id="joinBtn">Join</button>
+  <!-- MODE -->
+  <div id="mode" class="space-y-3">
+    <button id="hostBtn" class="w-full py-3 bg-orange-500 rounded-xl font-bold">Host Game</button>
+    <button id="joinBtn" class="w-full py-3 bg-teal-500 rounded-xl font-bold">Join Game</button>
   </div>
 
-  <div id="joinBox" class="hidden mt-4">
-    <input id="roomId" placeholder="Paste room id" />
-  </div>
+  <!-- JOIN -->
+  <input id="roomInput" class="hidden w-full mt-4 p-3 rounded-xl text-black"
+         placeholder="Paste Room Code">
 
-  <div class="mt-4">
-    <input id="name" placeholder="Your name" />
-  </div>
+  <!-- NAME -->
+  <input id="nameInput" class="w-full mt-4 p-3 rounded-xl text-black"
+         placeholder="Your Name">
 
-  <button id="goBtn" class="mt-4">Continue</button>
+  <button id="continueBtn"
+          class="w-full mt-4 py-3 bg-white text-black rounded-xl font-bold">
+    Continue
+  </button>
 
-  <div id="status" class="mt-4"></div>
-  <button id="readyBtn" class="hidden mt-4">READY</button>
+  <div id="status" class="mt-4 text-sm opacity-80"></div>
+
+  <button id="readyBtn"
+          class="hidden w-full mt-4 py-3 bg-green-500 rounded-xl font-bold">
+    READY
+  </button>
 </div>
 
-<canvas id="game" width="800" height="600" class="hidden"></canvas>
+<canvas id="game" width="800" height="500" class="hidden"></canvas>
 
 <script>
 let peer, conn
 let isHost = false
 let localReady = false
 let remoteReady = false
+let started = false
 let myName = ""
-let gameStarted = false
 
-const lobby = document.getElementById("lobby")
 const status = document.getElementById("status")
 const readyBtn = document.getElementById("readyBtn")
+const lobby = document.getElementById("lobby")
 const canvas = document.getElementById("game")
 const ctx = canvas.getContext("2d")
 
-document.getElementById("hostBtn").onclick = () => {
+hostBtn.onclick = () => {
   isHost = true
-  document.getElementById("joinBox").classList.add("hidden")
+  roomInput.classList.add("hidden")
+  status.innerText = "Hosting a new room"
 }
 
-document.getElementById("joinBtn").onclick = () => {
+joinBtn.onclick = () => {
   isHost = false
-  document.getElementById("joinBox").classList.remove("hidden")
+  roomInput.classList.remove("hidden")
+  status.innerText = "Joining a room"
 }
 
-document.getElementById("goBtn").onclick = () => {
-  myName = document.getElementById("name").value || "Player"
-  init()
+continueBtn.onclick = () => {
+  myName = nameInput.value || "Player"
+  initPeer()
 }
 
-function init(){
+function initPeer() {
   peer = new Peer()
 
   peer.on("open", id => {
-    if(isHost){
-      status.innerText = "Room ID: " + id
+    if (isHost) {
+      status.innerText = `Room Code: ${id}`
     } else {
-      const rid = document.getElementById("roomId").value
-      conn = peer.connect(rid)
+      conn = peer.connect(roomInput.value.trim())
       setupConn()
     }
   })
 
   peer.on("connection", c => {
-    if(!conn){
+    if (!conn) {
       conn = c
       setupConn()
     }
   })
 }
 
-function setupConn(){
+function setupConn() {
   conn.on("open", () => {
-    status.innerText = "Connected"
+    status.innerText = "Connected — press READY"
     readyBtn.classList.remove("hidden")
-
-    // 🔑 Always send name
-    conn.send({type:"NAME",name:myName})
+    conn.send({ type: "NAME", name: myName })
   })
 
   conn.on("data", msg => {
-    if(msg.type === "NAME"){
-      status.innerText = msg.name + " joined"
+    if (msg.type === "NAME") {
+      status.innerText = `${msg.name} connected`
     }
-
-    if(msg.type === "CLIENT_READY"){
+    if (msg.type === "READY") {
       remoteReady = true
-      checkReady()
+      status.innerText = "Partner is ready"
+      checkStart()
     }
-
-    if(msg.type === "HOST_READY"){
-      remoteReady = true
-      checkReady()
-    }
-
-    if(msg.type === "START"){
-      startGame()
-    }
+    if (msg.type === "START") startGame()
   })
 }
 
@@ -126,40 +129,31 @@ readyBtn.onclick = () => {
   localReady = true
   readyBtn.disabled = true
   readyBtn.innerText = "Waiting..."
-
-  if(isHost){
-    conn.send({type:"HOST_READY"})
-  } else {
-    conn.send({type:"CLIENT_READY"})
-  }
-
-  checkReady()
+  conn.send({ type: "READY" })
+  checkStart()
 }
 
-function checkReady(){
-  if(localReady && remoteReady && isHost && !gameStarted){
-    conn.send({type:"START"})
+function checkStart() {
+  if (localReady && remoteReady && isHost && !started) {
+    conn.send({ type: "START" })
     startGame()
   }
 }
 
-function startGame(){
-  if(gameStarted) return
-  gameStarted = true
-
+function startGame() {
+  if (started) return
+  started = true
   lobby.classList.add("hidden")
   canvas.classList.remove("hidden")
+  draw()
+}
 
-  let x = isHost ? 200 : 600
-
-  function loop(){
-    ctx.clearRect(0,0,800,600)
-    ctx.fillStyle = "#fff"
-    ctx.font = "40px sans-serif"
-    ctx.fillText(isHost?"🦊":"🐰", x, 300)
-    requestAnimationFrame(loop)
-  }
-  loop()
+function draw() {
+  ctx.clearRect(0,0,800,500)
+  ctx.font = "60px sans-serif"
+  ctx.textAlign = "center"
+  ctx.fillText(isHost ? "🦊" : "🐰", 400, 250)
+  requestAnimationFrame(draw)
 }
 </script>
 
