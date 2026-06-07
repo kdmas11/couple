@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Minimal PeerJS Tester</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .panel { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+    <h2>PeerJS Connection Tester</h2>
+    <div id="status">Status: Disconnected</div>
+
+    <hr>
+
+    <div class="panel">
+        <h3>1. Host a Connection</h3>
+        <button onclick="hostRoom()">Generate Room Code</button>
+        <p>Your Room Code: <strong id="room-code">...</strong></p>
+    </div>
+
+    <div class="panel">
+        <h3>2. Join a Connection</h3>
+        <input type="text" id="join-code" placeholder="Enter Host's Room Code">
+        <button onclick="joinRoom()">Join Room</button>
+    </div>
+
+    <div class="panel" id="messaging" style="display: none;">
+        <h3>3. Send Data</h3>
+        <button onclick="sendHello()">Send "Hello" to Partner</button>
+        <p>Latest Message Received: <strong id="received-message">None</strong></p>
+    </div>
+
+    <script>
+        let peerInstance = null;
+        let activeConnection = null;
+        let isHost = false;
+
+        // --- HOST LOGIC ---
+        function hostRoom() {
+            document.getElementById("status").innerText = "Status: Initializing Host...";
+            
+            peerInstance = new Peer(); // Auto-generates a unique ID
+            
+            peerInstance.on("open", (id) => {
+                isHost = true;
+                document.getElementById("room-code").innerText = id;
+                document.getElementById("status").innerText = "Status: Waiting for partner...";
+            });
+
+            // Listen for incoming connections from a client
+            peerInstance.on("connection", (conn) => {
+                activeConnection = conn;
+                setupDataListener();
+            });
+        }
+
+        // --- JOIN LOGIC ---
+        function joinRoom() {
+            const joinId = document.getElementById("join-code").value.trim();
+            if (!joinId) return alert("Enter a code!");
+
+            document.getElementById("status").innerText = "Status: Connecting...";
+            peerInstance = new Peer();
+
+            peerInstance.on("open", () => {
+                isHost = false;
+                // Connect to the Host's ID
+                activeConnection = peerInstance.connect(joinId);
+                
+                // Wait for the connection to fully open before setting up the listener
+                activeConnection.on("open", () => {
+                    setupDataListener();
+                });
+            });
+        }
+
+        // --- DATA HANDLING ---
+        function setupDataListener() {
+            document.getElementById("status").innerText = "Status: Connected successfully!";
+            document.getElementById("messaging").style.display = "block";
+
+            // Listen for data coming from the other person
+            activeConnection.on("data", (data) => {
+                console.log("Received data:", data);
+                
+                if (data.type === "GREETING") {
+                    document.getElementById("received-message").innerText = data.text;
+                }
+            });
+        }
+
+        // --- SENDING DATA ---
+        function sendHello() {
+            if (activeConnection && activeConnection.open) {
+                const message = isHost ? "Hello from the Host!" : "Hello from the Client!";
+                
+                // Send a JSON object over WebRTC
+                activeConnection.send({
+                    type: "GREETING",
+                    text: message
+                });
+            } else {
+                alert("Connection is not open yet.");
+            }
+        }
+    </script>
+</body>
+</html>
