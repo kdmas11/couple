@@ -487,10 +487,11 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 let uid, myName, roomId, isCreator = false;
-let currentStep = 0;
-let stepStartTime = 0;
-let myChoiceTime  = 0;
-let partnerChoiceListener = null;
+let currentStep     = 0;
+let lastRenderedStep = -1;   // guards against re-rendering same step
+let resultShown     = false; // prevents double-firing result
+let stepStartTime   = 0;
+let myChoiceTime    = 0;
 
 /* ─── ANALYTICS STATE ─── */
 const analytics = {
@@ -627,14 +628,35 @@ window.copyCode = () => {
 function listenRoom() {
   onValue(ref(db, 'rooms/' + roomId), snap => {
     const d = snap.val();
-    if (!d) return;
-    if (!d.ready) return;
-    currentStep = d.step || 0;
-    if (currentStep >= bakingSteps.length) {
+    if (!d || !d.ready) return;
+
+    const step    = d.step || 0;
+    const players = d.players ? Object.entries(d.players) : [];
+
+    /* ── Game over ── */
+    if (step >= bakingSteps.length) {
       generateReport(d);
       return;
     }
-    showStep(d);
+
+    /* ── New step arrived → render the question screen ── */
+    if (step !== lastRenderedStep) {
+      lastRenderedStep = step;
+      currentStep      = step;
+      resultShown      = false;
+      showStep(d);
+      return;
+    }
+
+    /* ── Same step: check if BOTH players have now chosen ── */
+    if (resultShown) return; // already showing result for this step
+    if (players.length < 2) return;
+    const vals = players.map(([, v]) => v);
+    if (!vals.every(p => p.choice)) return; // partner hasn't chosen yet
+
+    /* ── Both chosen → show result (fires on both devices simultaneously) ── */
+    resultShown = true;
+    processResult(vals);
   });
 }
 
@@ -657,13 +679,13 @@ function showStep(d) {
   $('skipQuestBtn').style.display = 'none';
   questActive = false;
 
-  // Quest
+  // Quest — showStep fires exactly once per step (guarded by lastRenderedStep)
   const qb = $('questBanner');
   if (s.quest) {
     $('questName').innerText = s.quest.name;
     $('questDesc').innerText = s.quest.desc;
     qb.classList.add('visible');
-    analytics.questsAttempted++;
+    analytics.questsAttempted++; // safe: called once per step
     questActive = true;
     $('skipQuestBtn').style.display = 'block';
     if (s.quest.duration) startQuestTimer(s.quest.duration);
@@ -674,10 +696,10 @@ function showStep(d) {
 
   stepStartTime = Date.now();
 
-  // My existing choice on reconnect
-  const me = d.players?.[uid];
-  if (me?.choice) {
-    highlightChoice(me.choice);
+  // Restore my choice if I already picked (e.g. page refresh / reconnect)
+  const myData = d.players?.[uid];
+  if (myData?.choice) {
+    highlightChoice(myData.choice);
     $('waitingHint').classList.remove('hidden');
   }
 
@@ -717,39 +739,26 @@ function highlightChoice(c) {
 
 /* ─── CHOOSE ─── */
 window.choose = async (c) => {
-  const me = (await get(ref(db, `rooms/${roomId}/players/${uid}`))).val();
-  if (me?.choice) return; // already chose
+  // Prevent double-tap or choosing after already locked
+  if ($('choiceA').classList.contains('locked')) return;
 
   myChoiceTime = Date.now();
-  const elapsed = myChoiceTime - stepStartTime;
-  analytics.decisionTimes.push(elapsed);
+  analytics.decisionTimes.push(myChoiceTime - stepStartTime);
 
+  // Lock UI immediately so partner's Firebase update can't re-trigger showStep
   highlightChoice(c);
   $('waitingHint').classList.remove('hidden');
 
+  // Write to Firebase — listenRoom will detect when both have chosen
   await update(ref(db, `rooms/${roomId}/players/${uid}`), {
     choice: c,
     choiceTime: myChoiceTime
-  });
-
-  // Listen for partner
-  if (partnerChoiceListener) partnerChoiceListener();
-  partnerChoiceListener = onValue(ref(db, `rooms/${roomId}/players`), snap => {
-    const players = snap.val();
-    if (!players) return;
-    const vals = Object.values(players);
-    if (vals.length < 2) return;
-    if (!vals.every(p => p.choice)) return;
-    partnerChoiceListener();
-    partnerChoiceListener = null;
-    processResult(vals);
   });
 };
 
 /* ─── PROCESS RESULT ─── */
 function processResult(players) {
-  const me      = players.find(p => Object.keys((db._repoInternal?.infoEvents ?? {})).length >= 0
-    ) ?? players[0]; // fallback
+  // players is already an array of player objects (values only)
   const p0 = players[0];
   const p1 = players[1];
 
@@ -812,13 +821,16 @@ function processResult(players) {
 /* ─── NEXT STEP ─── */
 window.nextStep = async () => {
   const nextStepIdx = currentStep + 1;
-  // Reset choices
+
+  // Fetch current players and null out their choices for the new round
   const playersSnap = await get(ref(db, `rooms/${roomId}/players`));
-  const players = playersSnap.val();
+  const players = playersSnap.val() || {};
   const resetPlayers = {};
   Object.keys(players).forEach(k => {
-    resetPlayers[k] = { ...players[k], choice: null, choiceTime: null };
+    resetPlayers[k] = { name: players[k].name, choice: null, choiceTime: null };
   });
+
+  // Writing step + cleared choices atomically triggers listenRoom on both devices
   await update(ref(db, 'rooms/' + roomId), {
     step: nextStepIdx,
     players: resetPlayers
@@ -958,7 +970,10 @@ window.resetGame = () => {
   analytics.questsCompleted = 0;
   analytics.responsiveness  = [];
   analytics.stepHistory     = [];
-  roomId = null;
+  roomId           = null;
+  lastRenderedStep = -1;
+  resultShown      = false;
+  currentStep      = 0;
   show('roomScreen');
 };
 
