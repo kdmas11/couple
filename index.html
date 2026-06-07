@@ -480,9 +480,6 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getDatabase(app);
 
-// Generate a random ID unique to this tab session to allow same-browser testing
-const myPlayerId = Math.random().toString(36).substring(2, 10);
-
 let uid, myName, roomId, isCreator = false;
 let currentStep     = 0;
 let lastRenderedStep = -1;   // guards against re-rendering same step
@@ -598,7 +595,7 @@ window.createRoom = async () => {
   await set(ref(db, 'rooms/' + roomId), {
     step: 0,
     ready: false,
-    players: { [myPlayerId]: { name: myName, choice: null, choiceTime: null } }
+    players: { [uid]: { name: myName, choice: null, choiceTime: null } }
   });
   $('roomCodeDisplay').innerText = roomId;
   show('waitScreen');
@@ -609,7 +606,7 @@ window.createRoom = async () => {
 window.joinRoom = async () => {
   roomId = $('roomInput').value.trim().toUpperCase();
   if (!roomId) return;
-  await set(ref(db, `rooms/${roomId}/players/${myPlayerId}`), { name: myName, choice: null, choiceTime: null });
+  await set(ref(db, `rooms/${roomId}/players/${uid}`), { name: myName, choice: null, choiceTime: null });
   await update(ref(db, 'rooms/' + roomId), { ready: true });
   show('waitScreen');
   listenRoom();
@@ -694,7 +691,7 @@ function showStep(d) {
   stepStartTime = Date.now();
 
   // Restore my choice if I already picked (e.g. page refresh / reconnect)
-  const myData = d.players?.[myPlayerId];
+  const myData = d.players?.[uid];
   if (myData?.choice) {
     highlightChoice(myData.choice);
     $('waitingHint').classList.remove('hidden');
@@ -747,7 +744,7 @@ window.choose = async (c) => {
   $('waitingHint').classList.remove('hidden');
 
   // Write to Firebase — listenRoom will detect when both have chosen
-  await update(ref(db, `rooms/${roomId}/players/${myPlayerId}`), {
+  await update(ref(db, `rooms/${roomId}/players/${uid}`), {
     choice: c,
     choiceTime: myChoiceTime
   });
@@ -766,7 +763,9 @@ function processResult(players) {
   if (p0.choiceTime && p1.choiceTime) {
     analytics.responsiveness.push(Math.abs(p0.choiceTime - p1.choiceTime));
     // Initiator: whoever chose first
-    const firstId = p0.choiceTime < p1.choiceTime ? p0 : p1;
+    const firstUid = p0.choiceTime < p1.choiceTime ? p0 : p1;
+    // We track whether "me" or "partner" went first more often
+    // (approximate: compare my uid vs others)
   }
 
   // Quest completion — rough heuristic: if quest had timer and both chose within window
