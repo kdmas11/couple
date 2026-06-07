@@ -383,11 +383,18 @@
                 peerInstance.on('open', () => {
                     activeConnection = peerInstance.connect(joinSessionId);
                     
+                    // Attach listeners IMMEDIATELY upon initiating connection to avoid race condition
+                    setupClientListeners();
+                    
                     activeConnection.on('open', () => {
                         document.getElementById('client-status').innerText = "Connected! Press Ready when you are.";
                         clientReadyBtn.classList.remove('hidden');
-                        activeConnection.send({ type: 'SET_NAME', data: myName });
-                        setupClientListeners();
+                        
+                        // Small delay to ensure host is fully ready to receive the name payload
+                        setTimeout(() => {
+                            activeConnection.send({ type: 'SET_NAME', data: myName });
+                        }, 250);
+                        
                         animate(); // Start render loop
                     });
 
@@ -428,8 +435,11 @@
                 peerInstance.on('connection', (conn) => {
                     activeConnection = conn;
                     
+                    // Attach listeners IMMEDIATELY upon receiving connection to prevent race condition
+                    setupHostListeners();
+                    
                     activeConnection.on('open', () => {
-                        setupHostListeners();
+                        // Connection fully open
                     });
                 });
             }
@@ -460,6 +470,7 @@
 
         function setupClientListeners() {
             // Client listens for Game State updates and Start Events
+            if(!activeConnection) return;
             activeConnection.on('data', (payload) => {
                 if (payload.type === 'STATE') {
                     const prevPhase = gameState.phase;
