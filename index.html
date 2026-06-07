@@ -1,194 +1,141 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Couples Compatibility Game</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Couple Compatibility Game</title>
 
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #111;
-    color: #fff;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-  }
-  .card {
-    background: #1c1c1c;
-    padding: 20px;
-    border-radius: 10px;
-    width: 320px;
-    text-align: center;
-  }
-  button {
-    padding: 10px;
-    margin: 8px 0;
-    width: 100%;
-    background: #ff4d6d;
-    border: none;
-    color: #fff;
-    font-size: 16px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  input {
-    padding: 10px;
-    width: 100%;
-    border-radius: 6px;
-    border: none;
-    margin-bottom: 10px;
-  }
-  .hidden { display: none; }
-</style>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    body { font-family: Arial; text-align: center; background:#fdf6e3 }
+    button { padding:12px 20px; margin:10px; font-size:16px }
+    .hidden { display:none }
+  </style>
 </head>
 
 <body>
 
-<div class="card">
+<h1>❤️ Compatibility Test</h1>
 
-  <!-- HOME -->
-  <div id="home">
-    <h2>💖 Couples Game</h2>
-    <button onclick="createRoom()">Create Room</button>
-    <input id="roomInput" placeholder="Enter Room Code">
-    <button onclick="joinRoom()">Join Room</button>
-  </div>
-
-  <!-- WAITING -->
-  <div id="waiting" class="hidden">
-    <h3>Waiting for partner...</h3>
-    <p>Room Code:</p>
-    <h2 id="roomCode"></h2>
-  </div>
-
-  <!-- GAME -->
-  <div id="game" class="hidden">
-    <h3 id="question"></h3>
-    <button onclick="submitAnswer('A')">Option A</button>
-    <button onclick="submitAnswer('B')">Option B</button>
-  </div>
-
-  <!-- RESULT -->
-  <div id="result" class="hidden">
-    <h3 id="resultText"></h3>
-    <button onclick="nextQuestion()">Next</button>
-  </div>
-
+<div id="lobby">
+  <input id="name" placeholder="Your name" />
+  <br>
+  <button onclick="createRoom()">Create Room</button>
+  <button onclick="joinRoom()">Join Room</button>
+  <input id="roomInput" placeholder="Room ID" />
 </div>
 
-<!-- FIREBASE -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+<div id="room" class="hidden">
+  <h3>Room: <span id="roomId"></span></h3>
+  <p id="status">Waiting for partner...</p>
+</div>
 
-/* 🔥 REPLACE WITH YOUR FIREBASE CONFIG */
-const firebaseConfig = {
+<div id="game" class="hidden">
+  <h2 id="question"></h2>
+  <button onclick="answer('A')">Option A</button>
+  <button onclick="answer('B')">Option B</button>
+</div>
+
+<div id="result" class="hidden">
+  <h2>Compatibility</h2>
+  <h1 id="score"></h1>
+</div>
+
+<script>
+/* ---------------- FIREBASE CONFIG ---------------- */
+firebase.initializeApp({
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "XXXX",
-  appId: "XXXX"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-let userId, roomId, role;
-let currentQuestion = 0;
-
-const questions = [
-  "How do you handle arguments?",
-  "What matters more: time or money?",
-  "Are you a planner or spontaneous?"
-];
-
-signInAnonymously(auth).then(res => {
-  userId = res.user.uid;
+  projectId: "YOUR_PROJECT_ID"
 });
 
-window.createRoom = async () => {
-  roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
-  role = "playerA";
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-  await setDoc(doc(db, "rooms", roomId), {
+/* ---------------- GAME DATA ---------------- */
+const questions = [
+  { q: "How do you handle conflicts?", A:"Talk it out", B:"Need space" },
+  { q: "Weekend preference?", A:"Stay home", B:"Go out" }
+];
+
+let roomId, myUid, myName;
+
+/* ---------------- AUTH ---------------- */
+auth.signInAnonymously().then(res => {
+  myUid = res.user.uid;
+});
+
+/* ---------------- CREATE ROOM ---------------- */
+async function createRoom() {
+  myName = name.value;
+  roomId = Math.random().toString(36).substring(2,8);
+
+  await db.collection("rooms").doc(roomId).set({
+    phase: 0,
     questionIndex: 0,
-    playerA: {},
-    playerB: {},
-    status: "waiting"
-  });
-
-  document.getElementById("home").classList.add("hidden");
-  document.getElementById("waiting").classList.remove("hidden");
-  document.getElementById("roomCode").innerText = roomId;
-
-  listenRoom();
-};
-
-window.joinRoom = async () => {
-  roomId = document.getElementById("roomInput").value.trim().toUpperCase();
-  if (!roomId) return alert("Enter room code");
-
-  role = "playerB";
-  await updateDoc(doc(db, "rooms", roomId), { status: "ready" });
-
-  document.getElementById("home").classList.add("hidden");
-  document.getElementById("waiting").classList.remove("hidden");
-
-  listenRoom();
-};
-
-function listenRoom() {
-  onSnapshot(doc(db, "rooms", roomId), snap => {
-    const data = snap.data();
-    if (!data) return;
-
-    if (data.status === "ready") {
-      document.getElementById("waiting").classList.add("hidden");
-      document.getElementById("game").classList.remove("hidden");
-      document.getElementById("question").innerText = questions[data.questionIndex];
-    }
-
-    if (data.playerA.answer && data.playerB.answer) {
-      document.getElementById("game").classList.add("hidden");
-      document.getElementById("result").classList.remove("hidden");
-
-      const match = data.playerA.answer === data.playerB.answer;
-      document.getElementById("resultText").innerText =
-        match ? "💚 Great match!" : "💬 Different views — talk about it!";
+    players: {
+      [myUid]: { name: myName, answer: null }
     }
   });
+
+  enterRoom();
 }
 
-window.submitAnswer = async (ans) => {
-  await updateDoc(doc(db, "rooms", roomId), {
-    [`${role}.answer`]: ans
+/* ---------------- JOIN ROOM ---------------- */
+async function joinRoom() {
+  myName = name.value;
+  roomId = roomInput.value;
+
+  await db.collection("rooms").doc(roomId).update({
+    [`players.${myUid}`]: { name: myName, answer: null }
   });
-};
 
-window.nextQuestion = async () => {
-  currentQuestion++;
+  enterRoom();
+}
 
-  if (currentQuestion >= questions.length) {
-    alert("Game Over ❤️");
-    location.reload();
-    return;
+/* ---------------- ENTER ROOM ---------------- */
+function enterRoom() {
+  lobby.classList.add("hidden");
+  room.classList.remove("hidden");
+  document.getElementById("roomId").innerText = roomId;
+
+  db.collection("rooms").doc(roomId)
+    .onSnapshot(doc => handleUpdate(doc.data()));
+}
+
+/* ---------------- GAME LOGIC ---------------- */
+function handleUpdate(data) {
+  const players = Object.values(data.players);
+  if (players.length < 2) return;
+
+  if (data.phase === 0) {
+    startQuestion(data.questionIndex);
+    db.collection("rooms").doc(roomId).update({ phase: 1 });
   }
 
-  await updateDoc(doc(db, "rooms", roomId), {
-    questionIndex: currentQuestion,
-    playerA: {},
-    playerB: {}
-  });
+  const answers = players.map(p => p.answer).filter(a => a);
+  if (answers.length === 2) {
+    showResult(answers);
+  }
+}
 
-  document.getElementById("result").classList.add("hidden");
-  document.getElementById("game").classList.remove("hidden");
-};
+function startQuestion(i) {
+  game.classList.remove("hidden");
+  question.innerText = questions[i].q;
+}
+
+function answer(choice) {
+  db.collection("rooms").doc(roomId)
+    .update({ [`players.${myUid}.answer`]: choice });
+}
+
+function showResult(ans) {
+  game.classList.add("hidden");
+  result.classList.remove("hidden");
+  score.innerText = ans[0] === ans[1] ? "100%" : "50%";
+}
 </script>
 
 </body>
