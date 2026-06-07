@@ -2,115 +2,477 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Bake Our Love 💖</title>
+<title>Bake Together 🍰</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 
 <style>
+  :root {
+    --rose:    #f7a8b8;
+    --blush:   #fde8ed;
+    --cream:   #fdf6f0;
+    --caramel: #e8956d;
+    --cocoa:   #6b3d2e;
+    --sage:    #a8c4a2;
+    --ink:     #2d1f1a;
+    --mist:    rgba(255,255,255,0.72);
+    --shadow:  0 8px 32px rgba(107,61,46,.13);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
   body {
-    font-family: system-ui, sans-serif;
-    background: linear-gradient(135deg, #ff758c, #ff7eb3);
-    margin: 0;
-    height: 100vh;
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    min-height: 100vh;
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    overflow-x: hidden;
   }
 
+  /* subtle grain texture */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* warm mesh background */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 20%, #ffd6de44 0%, transparent 60%),
+      radial-gradient(ellipse 50% 60% at 80% 80%, #f7a8b833 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 60% 10%, #ffe0b222 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── CARD ─── */
   .card {
-    background: #fff;
-    width: 340px;
-    border-radius: 16px;
-    padding: 22px;
-    text-align: center;
-    box-shadow: 0 10px 25px rgba(0,0,0,.15);
+    position: relative;
+    z-index: 1;
+    width: min(400px, 96vw);
+    background: var(--mist);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.6);
+    border-radius: 28px;
+    padding: 34px 30px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
   }
 
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--rose), var(--caramel), var(--rose));
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+  }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* ─── SCREENS ─── */
+  .screen { display: none; animation: fadeUp .45s ease; }
+  .screen.active { display: block; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── TYPOGRAPHY ─── */
+  h1, h2 {
+    font-family: 'Playfair Display', serif;
+    color: var(--cocoa);
+    line-height: 1.25;
+  }
+  h1 { font-size: 2rem; margin-bottom: 6px; }
+  h2 { font-size: 1.45rem; margin-bottom: 10px; }
+  .subtitle { font-size: .9rem; color: #9e7060; margin-bottom: 22px; font-style: italic; }
+  p  { color: #7a5248; line-height: 1.6; font-size: .95rem; }
+
+  /* ─── INPUTS ─── */
   input {
     width: 100%;
-    padding: 14px;
-    font-size: 16px;
-    border-radius: 10px;
-    border: 1px solid #ddd;
+    padding: 13px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .95rem;
+    border: 1.5px solid #e8cfc9;
+    border-radius: 14px;
+    background: rgba(255,255,255,.7);
+    color: var(--ink);
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
     margin-bottom: 12px;
   }
+  input:focus { border-color: var(--caramel); box-shadow: 0 0 0 3px rgba(232,149,109,.15); }
+  input::placeholder { color: #c9a89e; }
 
-  button {
+  /* ─── BUTTONS ─── */
+  .btn {
     width: 100%;
     padding: 14px;
-    font-size: 16px;
-    border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .95rem;
+    font-weight: 500;
+    border-radius: 14px;
     border: none;
-    background: #ff4d6d;
-    color: white;
-    margin-top: 8px;
     cursor: pointer;
-    box-shadow: 0 6px 0 #e63950;
-    transition: transform .1s ease, box-shadow .1s ease;
+    transition: transform .12s ease, box-shadow .12s ease, opacity .2s;
+    margin-top: 8px;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: none !important; }
+  .btn:disabled { opacity: .55; cursor: default; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #f9818e, var(--caramel));
+    color: white;
+    box-shadow: 0 5px 0 #d4735a, 0 8px 20px rgba(232,149,109,.3);
+  }
+  .btn-secondary {
+    background: var(--blush);
+    color: var(--cocoa);
+    box-shadow: 0 5px 0 #f5c7d2;
+  }
+  .btn-soft {
+    background: rgba(168,196,162,.25);
+    color: #4a7a44;
+    border: 1.5px solid rgba(168,196,162,.5);
+    box-shadow: none;
+    margin-top: 4px;
+  }
+  .btn-ghost {
+    background: transparent;
+    color: #9e7060;
+    border: 1.5px solid #e8cfc9;
+    box-shadow: none;
+    font-size: .88rem;
+    padding: 10px;
   }
 
-  button:active {
-    transform: translateY(4px);
-    box-shadow: 0 2px 0 #e63950;
+  /* ─── CODE BADGE ─── */
+  .room-code {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: var(--cocoa);
+    letter-spacing: .2em;
+    background: var(--blush);
+    border-radius: 16px;
+    padding: 18px;
+    margin: 18px 0;
+    cursor: pointer;
+    transition: background .2s;
+    user-select: all;
+  }
+  .room-code:hover { background: #ffccd6; }
+  .copy-hint { font-size: .78rem; color: #b88a80; margin-top: -10px; margin-bottom: 8px; }
+
+  /* ─── CHOICE CARDS ─── */
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+  .choice-card {
+    padding: 18px 12px;
+    border-radius: 18px;
+    border: 2px solid transparent;
+    background: rgba(255,255,255,.65);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    font-weight: 500;
+    color: var(--cocoa);
+    text-align: center;
+    transition: all .18s ease;
+    box-shadow: 0 3px 10px rgba(107,61,46,.07);
+    line-height: 1.35;
+  }
+  .choice-card .icon { font-size: 1.6rem; display: block; margin-bottom: 6px; }
+  .choice-card:hover { background: white; border-color: var(--rose); transform: translateY(-2px); }
+  .choice-card.selected { background: var(--blush); border-color: var(--caramel); }
+  .choice-card.locked { cursor: default; pointer-events: none; }
+  .waiting-hint { font-size: .83rem; color: #b88a80; text-align: center; margin-top: 12px; animation: pulse 1.8s ease infinite; }
+  @keyframes pulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+
+  /* ─── PROGRESS ─── */
+  .progress-track {
+    display: flex; gap: 6px; justify-content: center;
+    margin-bottom: 22px;
+  }
+  .progress-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #e8cfc9;
+    transition: background .3s, transform .3s;
+  }
+  .progress-dot.done { background: var(--caramel); transform: scale(1.2); }
+  .progress-dot.active { background: var(--rose); transform: scale(1.35); }
+
+  /* ─── MINI QUEST BANNER ─── */
+  .quest-banner {
+    background: linear-gradient(135deg, rgba(168,196,162,.3), rgba(168,196,162,.15));
+    border: 1.5px solid rgba(168,196,162,.5);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    display: none;
+  }
+  .quest-banner.visible { display: block; animation: fadeUp .35s ease; }
+  .quest-banner .quest-label { font-size: .72rem; font-weight: 500; text-transform: uppercase; letter-spacing: .1em; color: #5a8a54; margin-bottom: 4px; }
+  .quest-banner .quest-name { font-family: 'Playfair Display', serif; font-size: 1.05rem; color: #3a5a36; margin-bottom: 4px; }
+  .quest-banner .quest-desc { font-size: .83rem; color: #5a7856; }
+
+  /* ─── TIMER ─── */
+  .timer-ring { position: relative; display: inline-block; margin-bottom: 12px; }
+  .timer-ring svg { transform: rotate(-90deg); }
+  .timer-ring .timer-num {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem; font-weight: 700;
+    color: var(--cocoa);
   }
 
-  .soft {
-    background: #ffd6de;
-    color: #333;
-    box-shadow: 0 6px 0 #ffb3c1;
+  /* ─── RESULT BADGE ─── */
+  .result-badge {
+    display: inline-block;
+    font-size: .78rem; font-weight: 500;
+    letter-spacing: .08em; text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 20px;
+    margin-bottom: 14px;
+  }
+  .result-badge.match { background: rgba(168,196,162,.3); color: #4a7a44; }
+  .result-badge.diff  { background: rgba(247,168,184,.3); color: #a0404c; }
+
+  /* ─── REPORT ─── */
+  .report-section { margin-bottom: 22px; }
+  .report-label {
+    font-size: .72rem; font-weight: 500; text-transform: uppercase;
+    letter-spacing: .1em; color: #b88a80; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .report-label::after {
+    content: ''; flex: 1; height: 1px; background: #f0dbd5;
+  }
+  .report-narrative {
+    font-size: .93rem; color: #7a5248; line-height: 1.7;
+    background: rgba(255,255,255,.55);
+    border-radius: 12px;
+    padding: 14px 16px;
+    border-left: 3px solid var(--rose);
+  }
+  .strength-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px dashed #f0dbd5;
+    font-size: .9rem; color: #6b4040; line-height: 1.5;
+  }
+  .strength-item:last-child { border-bottom: none; }
+  .strength-item .dot { color: var(--caramel); font-size: 1rem; margin-top: 1px; flex-shrink: 0; }
+  .grow-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 0;
+    font-size: .9rem; color: #6b4040; line-height: 1.5;
+  }
+  .grow-item .dot { color: var(--sage); font-size: 1rem; margin-top: 1px; flex-shrink: 0; }
+
+  .tip-card {
+    background: rgba(255,255,255,.6);
+    border-radius: 14px;
+    padding: 13px 15px;
+    margin-bottom: 8px;
+    font-size: .88rem;
+    color: #6b4040;
+    line-height: 1.55;
+    border: 1px solid rgba(247,168,184,.35);
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .tip-card .tip-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; font-weight: 700;
+    color: var(--rose);
+    flex-shrink: 0;
+    line-height: 1;
+    margin-top: 1px;
   }
 
-  .hidden { display: none }
+  /* ─── DIMENSION BARS ─── */
+  .dim-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 9px;
+  }
+  .dim-label { font-size: .78rem; color: #9e7060; width: 110px; flex-shrink: 0; }
+  .dim-track {
+    flex: 1; height: 6px; background: #f0dbd5; border-radius: 3px; overflow: hidden;
+  }
+  .dim-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--rose), var(--caramel));
+    transform-origin: left;
+    animation: barGrow .8s cubic-bezier(.34,1.56,.64,1) forwards;
+    transform: scaleX(0);
+  }
+  @keyframes barGrow { to { transform: scaleX(1); } }
+
+  /* ─── CONFETTI ─── */
+  .confetti-wrap {
+    position: fixed; inset: 0; pointer-events: none; z-index: 999;
+    overflow: hidden;
+  }
+  .confetti-piece {
+    position: absolute;
+    width: 8px; height: 8px;
+    border-radius: 2px;
+    animation: confettiFall linear forwards;
+  }
+  @keyframes confettiFall {
+    0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #f0dbd5; border-radius: 2px; }
+
+  .scrollable { max-height: 68vh; overflow-y: auto; padding-right: 4px; }
+  .emoji-big { font-size: 2.6rem; display: block; margin-bottom: 10px; }
+  .partner-chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+  .chip {
+    font-size: .82rem;
+    padding: 5px 14px;
+    border-radius: 20px;
+    background: var(--blush);
+    color: var(--cocoa);
+    font-weight: 500;
+  }
+  .divider { height: 1px; background: #f0dbd5; margin: 20px 0; }
 </style>
 </head>
-
 <body>
+
+<div id="confettiWrap" class="confetti-wrap"></div>
 
 <div class="card">
 
-  <!-- NAME -->
-  <div id="nameScreen">
-    <h2>💖 Bake Our Love</h2>
-    <p>Your name?</p>
-    <input id="nameInput" placeholder="Enter your name" />
-    <button onclick="saveName()">Continue</button>
+  <!-- NAME SCREEN -->
+  <div class="screen active" id="nameScreen">
+    <span class="emoji-big">🍰</span>
+    <h1>Bake Together</h1>
+    <p class="subtitle">A little game for two</p>
+    <p style="margin-bottom:20px; font-size:.9rem;">Make choices, earn insights, discover how beautifully you work as a pair.</p>
+    <input id="nameInput" placeholder="Your name…" autocomplete="off" />
+    <button class="btn btn-primary" onclick="saveName()">Let's Begin →</button>
   </div>
 
-  <!-- ROOM -->
-  <div id="roomScreen" class="hidden">
-    <h2>Hello <span id="myName"></span> 👋</h2>
-    <button onclick="createRoom()">Create Room</button>
-    <input id="roomInput" placeholder="Enter partner code" />
-    <button class="soft" onclick="joinRoom()">Join Room</button>
+  <!-- ROOM SCREEN -->
+  <div class="screen" id="roomScreen">
+    <h2>Hello, <span id="myName" style="color:var(--caramel)"></span> 👋</h2>
+    <p class="subtitle">Find your partner</p>
+    <button class="btn btn-primary" onclick="createRoom()">Create a Room</button>
+    <div style="text-align:center;margin:10px 0;font-size:.8rem;color:#b88a80;">— or —</div>
+    <input id="roomInput" placeholder="Enter partner's code…" style="text-align:center;letter-spacing:.15em;text-transform:uppercase" autocomplete="off" />
+    <button class="btn btn-secondary" onclick="joinRoom()">Join Room</button>
   </div>
 
-  <!-- WAIT -->
-  <div id="waitScreen" class="hidden">
-    <h2>Waiting for partner…</h2>
-    <h1 id="roomCode"></h1>
-    <p>Share this code ❤️</p>
+  <!-- WAIT SCREEN -->
+  <div class="screen" id="waitScreen">
+    <span class="emoji-big">⏳</span>
+    <h2>Almost there…</h2>
+    <p class="subtitle">Share this code with your partner</p>
+    <div class="room-code" id="roomCodeDisplay" onclick="copyCode()" title="Click to copy"></div>
+    <p class="copy-hint">tap to copy</p>
+    <p style="font-size:.85rem;color:#b88a80;">Waiting for them to join 💌</p>
   </div>
 
-  <!-- GAME -->
-  <div id="gameScreen" class="hidden">
-    <h2 id="gameText"></h2>
-    <button onclick="choose('A')" id="btnA"></button>
-    <button onclick="choose('B')" class="soft" id="btnB"></button>
+  <!-- GAME SCREEN -->
+  <div class="screen" id="gameScreen">
+    <div class="progress-track" id="progressTrack"></div>
+    <div class="quest-banner" id="questBanner">
+      <div class="quest-label">✦ Mini Quest</div>
+      <div class="quest-name" id="questName"></div>
+      <div class="quest-desc" id="questDesc"></div>
+    </div>
+    <p style="font-size:.78rem;color:#b88a80;margin-bottom:6px;" id="stepLabel"></p>
+    <h2 id="gameQuestion"></h2>
+    <div class="choices">
+      <div class="choice-card" id="choiceA" onclick="choose('A')">
+        <span class="icon" id="iconA"></span>
+        <span id="labelA"></span>
+      </div>
+      <div class="choice-card" id="choiceB" onclick="choose('B')">
+        <span class="icon" id="iconB"></span>
+        <span id="labelB"></span>
+      </div>
+    </div>
+    <p class="waiting-hint hidden" id="waitingHint">Waiting for your partner… 💫</p>
+    <button class="btn btn-ghost" id="skipQuestBtn" style="margin-top:14px;display:none" onclick="skipQuest()">Skip quest →</button>
   </div>
 
-  <!-- RESULT -->
-  <div id="resultScreen" class="hidden">
-    <h2 id="resultText"></h2>
-    <button onclick="nextStep()">Continue Baking</button>
+  <!-- RESULT SCREEN -->
+  <div class="screen" id="resultScreen">
+    <div style="text-align:center;margin-bottom:6px">
+      <div class="result-badge" id="matchBadge"></div>
+    </div>
+    <span class="emoji-big" id="resultEmoji" style="text-align:center"></span>
+    <h2 id="resultHeadline" style="text-align:center"></h2>
+    <p style="text-align:center;margin-bottom:20px" id="resultSubtext"></p>
+    <div class="partner-chips" id="choiceChips"></div>
+    <button class="btn btn-primary" id="continueBtn" onclick="nextStep()">Continue Baking →</button>
+    <p style="font-size:.78rem;text-align:center;color:#b88a80;margin-top:8px" id="waitNextHint"></p>
+  </div>
+
+  <!-- REPORT SCREEN -->
+  <div class="screen" id="reportScreen">
+    <div class="scrollable">
+      <span class="emoji-big" style="text-align:center">🎂</span>
+      <h2 style="text-align:center;margin-bottom:4px">Your Bake Report</h2>
+      <p class="subtitle" style="text-align:center" id="reportNames"></p>
+
+      <div class="report-section">
+        <div class="report-label">How you worked together</div>
+        <div class="report-narrative" id="reportNarrative"></div>
+      </div>
+
+      <div class="report-section" id="dimensionSection">
+        <div class="report-label">Your connection shape</div>
+        <div id="dimensionBars"></div>
+      </div>
+
+      <div class="report-section">
+        <div class="report-label">Your natural strengths</div>
+        <div id="strengthsList"></div>
+      </div>
+
+      <div class="report-section">
+        <div class="report-label">Moments that can grow</div>
+        <div id="growList"></div>
+      </div>
+
+      <div class="report-section">
+        <div class="report-label">For your next bake together</div>
+        <div id="tipsList"></div>
+      </div>
+
+      <div class="divider"></div>
+      <button class="btn btn-primary" onclick="resetGame()" style="margin-top:4px">Bake Again 🍪</button>
+      <button class="btn btn-ghost" style="margin-top:6px" onclick="shareReport()">Share Report ↗</button>
+    </div>
   </div>
 
 </div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { initializeApp }      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, update, onValue, get }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-/* FIREBASE CONFIG */
+/* ─── FIREBASE ─── */
 const firebaseConfig = {
   apiKey: "AIzaSyAlN3n35NJQI2-mdNnVW7oyWSu3RN2YQsw",
   authDomain: "couplegame-ee52e.firebaseapp.com",
@@ -120,143 +482,513 @@ const firebaseConfig = {
   messagingSenderId: "340161084050",
   appId: "1:340161084050:web:82b571b0711a48ca30c44b"
 };
-
-const app = initializeApp(firebaseConfig);
+const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getDatabase(app);
+const db   = getDatabase(app);
 
-let uid, name, roomId;
-let step = 0;
+let uid, myName, roomId, isCreator = false;
+let currentStep = 0;
+let stepStartTime = 0;
+let myChoiceTime  = 0;
+let partnerChoiceListener = null;
 
-/* GAME STEPS */
+/* ─── ANALYTICS STATE ─── */
+const analytics = {
+  decisionTimes:    [],   // ms per step
+  agreements:       0,
+  disagreements:    0,
+  initiatorCounts:  { me: 0, partner: 0 }, // who chose first
+  questsAttempted:  0,
+  questsCompleted:  0,
+  responsiveness:   [],   // time gaps between partners
+  stepHistory:      [],   // { myChoice, partnerChoice, quest }
+};
+
+/* ─── GAME STEPS ─── */
 const bakingSteps = [
-  {
-    text: "Choose a base 🥣",
-    A: "Chocolate",
-    B: "Vanilla",
-    match: "Sweet harmony! ❤️",
-    diff: "Different tastes — talk & blend 💬"
+  { id: 'base',   label: 'Step 1 · Choose a base',
+    question: "What's your base?",
+    A: { icon: '🍫', label: 'Chocolate' },
+    B: { icon: '🍦', label: 'Vanilla' },
+    quest: null },
+  { id: 'pace',   label: 'Step 2 · Set your pace',
+    question: "How do you bake?",
+    A: { icon: '🐢', label: 'Slow & steady' },
+    B: { icon: '🐇', label: 'Fast & fun' },
+    quest: {
+      id: 'silent', name: 'Silent Step',
+      desc: 'Make this choice without chatting for 10 seconds. Trust your instincts.',
+      duration: 10
+    }
   },
-  {
-    text: "Baking pace?",
-    A: "Slow & steady",
-    B: "Fast & fun",
-    match: "Same rhythm — beautiful 💞",
-    diff: "Different pace — communicate ✨"
+  { id: 'frosting', label: 'Step 3 · Frosting style',
+    question: "Your frosting approach?",
+    A: { icon: '✨', label: 'Simple & clean' },
+    B: { icon: '🎨', label: 'Elaborate & fun' },
+    quest: null },
+  { id: 'filling', label: 'Step 4 · Secret filling',
+    question: "Hidden inside?",
+    A: { icon: '🍓', label: 'Fruity surprise' },
+    B: { icon: '🍮', label: 'Rich custard' },
+    quest: {
+      id: 'trust', name: 'Trust Choice',
+      desc: 'Let your partner decide for you. Before seeing their pick — commit to accepting it.',
+      duration: null
+    }
   },
-  {
-    text: "Final touch?",
-    A: "Simple",
-    B: "Decorated",
-    match: "Shared vision 🎂",
-    diff: "Different styles — mix magic ✨"
+  { id: 'finish', label: 'Step 5 · The final touch',
+    question: "How do you finish?",
+    A: { icon: '🕯️', label: 'Candlelit & intimate' },
+    B: { icon: '🎉', label: 'Festive & shared' },
+    quest: null },
+  { id: 'rescue', label: 'Bonus · Rescue Round',
+    question: "The oven timer went off! Quick, save the cake?",
+    A: { icon: '💨', label: 'Cool it fast' },
+    B: { icon: '🧡', label: 'Wrap in warmth' },
+    quest: {
+      id: 'rescue', name: 'Rescue Moment',
+      desc: 'You have 15 seconds to agree — the cake is at stake! Decide together quickly.',
+      duration: 15
+    }
   }
 ];
 
-/* AUTH */
-signInAnonymously(auth).then(r => uid = r.user.uid);
+const MATCH_LINES = [
+  { headline: "You're in sync!", sub: "Same instinct, same heart.", emoji: '💞', badge: 'In Harmony' },
+  { headline: "A perfect blend!", sub: "Great minds think alike.", emoji: '🎂', badge: 'Matched' },
+  { headline: "Beautifully aligned!", sub: "You chose the same path.", emoji: '✨', badge: 'In Harmony' },
+];
+const DIFF_LINES = [
+  { headline: "Different flavours!", sub: "That's the beauty of you two.", emoji: '🌈', badge: 'Beautifully Different' },
+  { headline: "A little contrast", sub: "Talk it out and blend it in.", emoji: '💬', badge: 'Worth Discussing' },
+  { headline: "Your uniqueness shows!", sub: "Different spices, one recipe.", emoji: '🌿', badge: 'Beautifully Different' },
+];
 
-/* UI helper */
+/* ─── HELPERS ─── */
 function show(id) {
-  document.querySelectorAll(".card > div").forEach(d => d.classList.add("hidden"));
-  document.getElementById(id).classList.remove("hidden");
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function $(id) { return document.getElementById(id); }
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function updateProgress(current, total) {
+  const track = $('progressTrack');
+  track.innerHTML = '';
+  for (let i = 0; i < total; i++) {
+    const d = document.createElement('div');
+    d.className = 'progress-dot' + (i < current ? ' done' : i === current ? ' active' : '');
+    track.appendChild(d);
+  }
 }
 
-/* NAME */
+/* ─── AUTH ─── */
+signInAnonymously(auth).then(r => { uid = r.user.uid; });
+
+/* ─── NAME ─── */
 window.saveName = () => {
-  name = nameInput.value.trim();
-  if (!name) return;
-  myName.innerText = name;
-  show("roomScreen");
+  myName = $('nameInput').value.trim();
+  if (!myName) return;
+  $('myName').innerText = myName;
+  show('roomScreen');
 };
 
-/* CREATE ROOM */
+/* ─── CREATE ─── */
 window.createRoom = async () => {
-  roomId = Math.random().toString(36).substring(2,7).toUpperCase();
-
-  await set(ref(db, "rooms/" + roomId), {
+  isCreator = true;
+  roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+  await set(ref(db, 'rooms/' + roomId), {
     step: 0,
     ready: false,
-    players: {
-      [uid]: { name, choice: null }
-    }
+    players: { [uid]: { name: myName, choice: null, choiceTime: null } }
   });
-
-  roomCode.innerText = roomId;
-  show("waitScreen");
-  listen();
+  $('roomCodeDisplay').innerText = roomId;
+  show('waitScreen');
+  listenRoom();
 };
 
-/* JOIN ROOM */
+/* ─── JOIN ─── */
 window.joinRoom = async () => {
-  roomId = roomInput.value.trim().toUpperCase();
+  roomId = $('roomInput').value.trim().toUpperCase();
   if (!roomId) return;
-
-  await set(ref(db, "rooms/" + roomId + "/players/" + uid), {
-    name,
-    choice: null
-  });
-
-  await update(ref(db, "rooms/" + roomId), {
-    ready: true
-  });
-
-  show("waitScreen");
-  listen();
+  await set(ref(db, `rooms/${roomId}/players/${uid}`), { name: myName, choice: null, choiceTime: null });
+  await update(ref(db, 'rooms/' + roomId), { ready: true });
+  show('waitScreen');
+  listenRoom();
 };
 
-/* LISTENER */
-function listen() {
-  onValue(ref(db, "rooms/" + roomId), snap => {
+window.copyCode = () => {
+  navigator.clipboard?.writeText(roomId);
+  $('roomCodeDisplay').innerText = '✓ Copied!';
+  setTimeout(() => { $('roomCodeDisplay').innerText = roomId; }, 1500);
+};
+
+/* ─── LISTEN ROOM ─── */
+function listenRoom() {
+  onValue(ref(db, 'rooms/' + roomId), snap => {
     const d = snap.val();
-    if (!d || !d.ready) return;
-    step = d.step || 0;
-    startStep(d);
+    if (!d) return;
+    if (!d.ready) return;
+    currentStep = d.step || 0;
+    if (currentStep >= bakingSteps.length) {
+      generateReport(d);
+      return;
+    }
+    showStep(d);
   });
 }
 
-/* START STEP */
-function startStep(d) {
-  const s = bakingSteps[d.step];
-  if (!s) return;
-  gameText.innerText = s.text;
-  btnA.innerText = s.A;
-  btnB.innerText = s.B;
-  show("gameScreen");
+/* ─── SHOW STEP ─── */
+let questTimer = null;
+let questActive = false;
+
+function showStep(d) {
+  const s = bakingSteps[currentStep];
+  updateProgress(currentStep, bakingSteps.length);
+  $('stepLabel').innerText   = s.label;
+  $('gameQuestion').innerText = s.question;
+  $('iconA').innerText  = s.A.icon;
+  $('labelA').innerText = s.A.label;
+  $('iconB').innerText  = s.B.icon;
+  $('labelB').innerText = s.B.label;
+  $('choiceA').classList.remove('selected', 'locked');
+  $('choiceB').classList.remove('selected', 'locked');
+  $('waitingHint').classList.add('hidden');
+  $('skipQuestBtn').style.display = 'none';
+  questActive = false;
+
+  // Quest
+  const qb = $('questBanner');
+  if (s.quest) {
+    $('questName').innerText = s.quest.name;
+    $('questDesc').innerText = s.quest.desc;
+    qb.classList.add('visible');
+    analytics.questsAttempted++;
+    questActive = true;
+    $('skipQuestBtn').style.display = 'block';
+    if (s.quest.duration) startQuestTimer(s.quest.duration);
+  } else {
+    qb.classList.remove('visible');
+    clearInterval(questTimer);
+  }
+
+  stepStartTime = Date.now();
+
+  // My existing choice on reconnect
+  const me = d.players?.[uid];
+  if (me?.choice) {
+    highlightChoice(me.choice);
+    $('waitingHint').classList.remove('hidden');
+  }
+
+  show('gameScreen');
 }
 
-/* CHOOSE */
+function startQuestTimer(sec) {
+  clearInterval(questTimer);
+  let remaining = sec;
+  // Show a tiny timer in the quest banner desc
+  const base = $('questDesc').innerText;
+  questTimer = setInterval(() => {
+    remaining--;
+    $('questDesc').innerText = base + `  (${remaining}s)`;
+    if (remaining <= 0) {
+      clearInterval(questTimer);
+      $('questDesc').innerText = base + '  ✓';
+      // quest window closed — choices still possible
+    }
+  }, 1000);
+}
+
+window.skipQuest = () => {
+  const qb = $('questBanner');
+  qb.classList.remove('visible');
+  clearInterval(questTimer);
+  questActive = false;
+  $('skipQuestBtn').style.display = 'none';
+};
+
+function highlightChoice(c) {
+  $('choiceA').classList.toggle('selected', c === 'A');
+  $('choiceA').classList.add('locked');
+  $('choiceB').classList.toggle('selected', c === 'B');
+  $('choiceB').classList.add('locked');
+}
+
+/* ─── CHOOSE ─── */
 window.choose = async (c) => {
+  const me = (await get(ref(db, `rooms/${roomId}/players/${uid}`))).val();
+  if (me?.choice) return; // already chose
+
+  myChoiceTime = Date.now();
+  const elapsed = myChoiceTime - stepStartTime;
+  analytics.decisionTimes.push(elapsed);
+
+  highlightChoice(c);
+  $('waitingHint').classList.remove('hidden');
+
   await update(ref(db, `rooms/${roomId}/players/${uid}`), {
-    choice: c
+    choice: c,
+    choiceTime: myChoiceTime
   });
 
-  onValue(ref(db, `rooms/${roomId}/players`), snap => {
-    const players = Object.values(snap.val());
-    if (players.length < 2) return;
-    if (!players.every(p => p.choice)) return;
-
-    const same = players[0].choice === players[1].choice;
-    resultText.innerText = same
-      ? bakingSteps[step].match
-      : bakingSteps[step].diff;
-
-    show("resultScreen");
-  }, { onlyOnce: true });
+  // Listen for partner
+  if (partnerChoiceListener) partnerChoiceListener();
+  partnerChoiceListener = onValue(ref(db, `rooms/${roomId}/players`), snap => {
+    const players = snap.val();
+    if (!players) return;
+    const vals = Object.values(players);
+    if (vals.length < 2) return;
+    if (!vals.every(p => p.choice)) return;
+    partnerChoiceListener();
+    partnerChoiceListener = null;
+    processResult(vals);
+  });
 };
 
-/* NEXT */
+/* ─── PROCESS RESULT ─── */
+function processResult(players) {
+  const me      = players.find(p => Object.keys((db._repoInternal?.infoEvents ?? {})).length >= 0
+    ) ?? players[0]; // fallback
+  const p0 = players[0];
+  const p1 = players[1];
+
+  const same = p0.choice === p1.choice;
+  if (same) analytics.agreements++; else analytics.disagreements++;
+
+  // Responsiveness gap
+  if (p0.choiceTime && p1.choiceTime) {
+    analytics.responsiveness.push(Math.abs(p0.choiceTime - p1.choiceTime));
+    // Initiator: whoever chose first
+    const firstUid = p0.choiceTime < p1.choiceTime ? p0 : p1;
+    // We track whether "me" or "partner" went first more often
+    // (approximate: compare my uid vs others)
+  }
+
+  // Quest completion — rough heuristic: if quest had timer and both chose within window
+  if (bakingSteps[currentStep]?.quest?.duration) {
+    const gap = analytics.responsiveness[analytics.responsiveness.length - 1] || 9999;
+    if (gap < bakingSteps[currentStep].quest.duration * 1000) {
+      analytics.questsCompleted++;
+    }
+  } else if (questActive) {
+    analytics.questsCompleted++;
+  }
+
+  analytics.stepHistory.push({
+    step: currentStep,
+    myChoice: null, // hidden for symmetry
+    agreed: same
+  });
+
+  const lines = same ? rand(MATCH_LINES) : rand(DIFF_LINES);
+  $('matchBadge').innerText = lines.badge;
+  $('matchBadge').className = 'result-badge ' + (same ? 'match' : 'diff');
+  $('resultEmoji').innerText  = lines.emoji;
+  $('resultHeadline').innerText = lines.headline;
+  $('resultSubtext').innerText  = lines.sub;
+
+  // Choice chips
+  const chips = $('choiceChips');
+  chips.innerHTML = '';
+  players.forEach(p => {
+    const s   = bakingSteps[currentStep];
+    const opt = p.choice === 'A' ? s.A : s.B;
+    const ch  = document.createElement('div');
+    ch.className = 'chip';
+    ch.innerText = `${p.name}: ${opt.icon} ${opt.label}`;
+    chips.appendChild(ch);
+  });
+
+  const isLast = currentStep >= bakingSteps.length - 1;
+  $('continueBtn').innerText = isLast ? 'See Our Report 🎂' : 'Continue Baking →';
+  $('waitNextHint').innerText = isCreator ? '' : 'Your partner will advance the round.';
+  if (!isCreator) $('continueBtn').style.display = 'none'; else $('continueBtn').style.display = 'block';
+
+  confettiBurst(same ? ['#f7a8b8','#ffd6de','#e8956d'] : ['#a8c4a2','#ffd6de','#f7a8b8']);
+  show('resultScreen');
+}
+
+/* ─── NEXT STEP ─── */
 window.nextStep = async () => {
-  await update(ref(db, "rooms/" + roomId), {
-    step: step + 1,
-    players: Object.fromEntries(
-      Object.entries((await (await fetch(
-        `${firebaseConfig.databaseURL}/rooms/${roomId}/players.json`
-      )).json())).map(([k,v]) => [k,{...v,choice:null}])
-    )
+  const nextStepIdx = currentStep + 1;
+  // Reset choices
+  const playersSnap = await get(ref(db, `rooms/${roomId}/players`));
+  const players = playersSnap.val();
+  const resetPlayers = {};
+  Object.keys(players).forEach(k => {
+    resetPlayers[k] = { ...players[k], choice: null, choiceTime: null };
+  });
+  await update(ref(db, 'rooms/' + roomId), {
+    step: nextStepIdx,
+    players: resetPlayers
   });
 };
-</script>
 
+/* ─── REPORT ─── */
+function generateReport(d) {
+  const players = Object.values(d.players || {});
+  const names   = players.map(p => p.name).join(' & ');
+
+  $('reportNames').innerText = names;
+
+  const total        = analytics.stepHistory.length || 1;
+  const agreePct     = analytics.agreements / total;
+  const avgTime      = analytics.decisionTimes.reduce((a,b) => a+b, 0) / (analytics.decisionTimes.length||1);
+  const avgGap       = analytics.responsiveness.reduce((a,b) => a+b, 0) / (analytics.responsiveness.length||1);
+  const questScore   = analytics.questsCompleted / Math.max(1, analytics.questsAttempted);
+  const timeImproved = analytics.decisionTimes.length > 2 &&
+    analytics.decisionTimes[analytics.decisionTimes.length-1] < analytics.decisionTimes[0];
+
+  // Dimension scores (0–1)
+  const dims = {
+    "Communication Flow":  clamp(1 - avgTime / 20000 + (timeImproved ? .2 : 0)),
+    "Emotional Safety":    clamp(.5 + agreePct * .3 + questScore * .2),
+    "Trust & Support":     clamp(questScore * .6 + agreePct * .4),
+    "Balance & Presence":  clamp(1 - Math.min(1, avgGap / 15000)),
+    "Growth Momentum":     clamp((timeImproved ? .6 : .35) + questScore * .4),
+  };
+
+  // Narrative
+  const narrative = buildNarrative(agreePct, avgGap, timeImproved, questScore, names);
+  $('reportNarrative').innerText = narrative;
+
+  // Dimension bars
+  const barsEl = $('dimensionBars');
+  barsEl.innerHTML = '';
+  Object.entries(dims).forEach(([label, score], i) => {
+    barsEl.innerHTML += `
+      <div class="dim-row">
+        <div class="dim-label">${label}</div>
+        <div class="dim-track">
+          <div class="dim-fill" style="width:${Math.round(score*100)}%;animation-delay:${i*.12}s"></div>
+        </div>
+      </div>`;
+  });
+
+  // Strengths
+  const strengths = buildStrengths(agreePct, avgGap, questScore, timeImproved);
+  const strengthsEl = $('strengthsList');
+  strengthsEl.innerHTML = strengths.map(s => `
+    <div class="strength-item"><span class="dot">✦</span><span>${s}</span></div>`).join('');
+
+  // Growth
+  const grows = buildGrows(agreePct, avgGap, questScore, timeImproved);
+  const growsEl = $('growList');
+  growsEl.innerHTML = grows.map(g => `
+    <div class="grow-item"><span class="dot">◌</span><span>${g}</span></div>`).join('');
+
+  // Tips
+  const tips = buildTips(agreePct, avgGap, questScore, timeImproved);
+  const tipsEl = $('tipsList');
+  tipsEl.innerHTML = tips.map((t, i) => `
+    <div class="tip-card"><span class="tip-num">${i+1}</span><span>${t}</span></div>`).join('');
+
+  show('reportScreen');
+  confettiBurst(['#f7a8b8','#a8c4a2','#ffd6de','#e8956d'], 60);
+}
+
+function clamp(v) { return Math.min(1, Math.max(.1, v)); }
+
+function buildNarrative(agreePct, avgGap, timeImproved, questScore, names) {
+  const synced = agreePct >= .6;
+  const fast   = avgGap < 4000;
+  const grew   = timeImproved;
+  const quests = questScore > .5;
+
+  let p = `${names}, you've just baked something together — and what it reveals is quietly beautiful. `;
+  if (synced && fast) {
+    p += `Your instincts aligned quickly and often, suggesting a natural ease in how you think alongside each other. `;
+  } else if (synced) {
+    p += `You found common ground in most choices, even if the pace was thoughtful. That thoughtfulness itself is a form of care. `;
+  } else {
+    p += `Your choices often diverged — and that's not a crack in the recipe, it's the texture that makes it interesting. Different perspectives in a partnership create depth, not distance. `;
+  }
+  if (fast) {
+    p += `There was a responsiveness between you — a willingness to show up promptly — that speaks well of your presence for each other, even across the distance. `;
+  } else {
+    p += `Moments of pause were woven through your session. In long-distance relationships, those pauses deserve patience, not pressure. `;
+  }
+  if (grew) {
+    p += `Noticeably, you both became more decisive as the game progressed — a lovely sign of growing ease and trust.`;
+  } else if (quests) {
+    p += `You took on the optional challenges together, which says something tender about your willingness to stretch for each other.`;
+  } else {
+    p += `Every bake is different. This one was yours.`;
+  }
+  return p;
+}
+
+function buildStrengths(agreePct, avgGap, questScore, timeImproved) {
+  const out = [];
+  if (agreePct >= .5) out.push("You share a surprising amount of common ground — your tastes and instincts overlap in meaningful ways.");
+  if (avgGap < 5000)  out.push("You're both present and responsive. Across whatever distance separates you, you show up for each other promptly.");
+  if (questScore > .4) out.push("You embraced the optional challenges together — a sign of playfulness and willingness to grow beyond the comfortable.");
+  if (timeImproved)   out.push("Your decision rhythm improved as you played — you loosened up, trusted more, and found your stride together.");
+  if (out.length < 2) out.push("You completed the full bake together — that consistency and follow-through is its own quiet strength.");
+  return out.slice(0, 3);
+}
+
+function buildGrows(agreePct, avgGap, questScore, timeImproved) {
+  const out = [];
+  if (agreePct < .4)  out.push("There were several moments of different choices. These aren't problems — but they're invitations to talk about why. Understanding the 'why' behind your partner's instinct often brings you closer than agreement itself.");
+  if (avgGap > 8000)  out.push("The pace between your responses sometimes stretched. In long-distance play especially, it can help to signal when you're thinking versus when life pulled you away — a simple 'still here' can carry a lot of warmth.");
+  if (questScore < .4) out.push("Some optional quests were skipped or went uncompleted. That's perfectly fine — but next time, trying at least one together, even imperfectly, might open a lovely new layer.");
+  if (!timeImproved)  out.push("Your decision pace stayed fairly consistent throughout. Nothing wrong with that — but allowing yourself to get slightly quicker and freer in later rounds can feel like a kind of letting-go together.");
+  return out.slice(0, 2);
+}
+
+function buildTips(agreePct, avgGap, questScore, timeImproved) {
+  const tips = [];
+  tips.push("Before your next session, each send the other one emoji — no words — that represents how you're feeling today. Then open the game. Let that emoji sit in the back of your mind as you bake.");
+  if (agreePct < .5) tips.push("Try a 'narrated round': as you choose, voice-note or type one word about why — not to convince, just to share. 'Chocolate because Sundays.' That context is intimacy.");
+  if (avgGap > 6000) tips.push("Try the 'three-count rule': when your partner hasn't responded, silently count to three and imagine them thinking carefully. It reframes the wait as presence, not absence.");
+  if (questScore < .5) tips.push("Commit to attempting every mini-quest next time, even if you 'fail' them. The attempt — especially the playful failure — is where some of the best moments live.");
+  if (!timeImproved) tips.push("In your next bake, let one partner fully lead the first two steps — no negotiating. Then swap. Notice how it feels to follow vs lead with your specific person.");
+  tips.push("After the game, stay in the moment for five more minutes. Ask one question that starts with 'I noticed…' — about the game, but really about each other.");
+  return tips.slice(0, 4);
+}
+
+/* ─── RESET ─── */
+window.resetGame = () => {
+  analytics.decisionTimes   = [];
+  analytics.agreements      = 0;
+  analytics.disagreements   = 0;
+  analytics.questsAttempted = 0;
+  analytics.questsCompleted = 0;
+  analytics.responsiveness  = [];
+  analytics.stepHistory     = [];
+  roomId = null;
+  show('roomScreen');
+};
+
+window.shareReport = () => {
+  const text = `We just played Bake Together 🎂 — a compatibility game for couples. Try it too!`;
+  if (navigator.share) navigator.share({ text });
+  else { navigator.clipboard?.writeText(text); alert('Copied to clipboard!'); }
+};
+
+/* ─── CONFETTI ─── */
+function confettiBurst(colors, count = 36) {
+  const wrap = $('confettiWrap');
+  wrap.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.cssText = `
+      left: ${Math.random()*100}%;
+      top: ${-10 + Math.random()*-20}px;
+      background: ${colors[Math.floor(Math.random()*colors.length)]};
+      border-radius: ${Math.random() > .5 ? '50%' : '2px'};
+      width:  ${5 + Math.random()*7}px;
+      height: ${5 + Math.random()*7}px;
+      animation-duration: ${1.5 + Math.random()*2}s;
+      animation-delay: ${Math.random()*.5}s;
+    `;
+    wrap.appendChild(el);
+  }
+  setTimeout(() => { wrap.innerHTML = ''; }, 4000);
+}
+</script>
 </body>
 </html>
