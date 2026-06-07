@@ -2,220 +2,193 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>🍰 Cozy Kitchen</title>
+<title>Couples Compatibility Game</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
-
 <style>
-body {
-  background: radial-gradient(circle at top, #3a2a27, #1a1110);
-  font-family: system-ui, sans-serif;
-}
-.glass {
-  background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(14px);
-}
-canvas {
-  background: radial-gradient(circle, #2d1b17, #140a08);
-}
+  body {
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+  }
+  .card {
+    background: #1c1c1c;
+    padding: 20px;
+    border-radius: 10px;
+    width: 320px;
+    text-align: center;
+  }
+  button {
+    padding: 10px;
+    margin: 8px 0;
+    width: 100%;
+    background: #ff4d6d;
+    border: none;
+    color: #fff;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  input {
+    padding: 10px;
+    width: 100%;
+    border-radius: 6px;
+    border: none;
+    margin-bottom: 10px;
+  }
+  .hidden { display: none; }
 </style>
 </head>
 
-<body class="min-h-screen flex items-center justify-center text-white">
+<body>
 
-<!-- LOBBY -->
-<div id="lobby" class="glass p-8 rounded-2xl w-[360px] text-center shadow-2xl">
-  <h1 class="text-4xl mb-6">🍰 Cozy Kitchen</h1>
+<div class="card">
 
-  <div class="space-y-3">
-    <button id="hostBtn" class="w-full py-3 bg-orange-500 rounded-xl font-bold">Host Game</button>
-    <button id="joinBtn" class="w-full py-3 bg-teal-500 rounded-xl font-bold">Join Game</button>
+  <!-- HOME -->
+  <div id="home">
+    <h2>💖 Couples Game</h2>
+    <button onclick="createRoom()">Create Room</button>
+    <input id="roomInput" placeholder="Enter Room Code">
+    <button onclick="joinRoom()">Join Room</button>
   </div>
 
-  <input id="roomInput" class="hidden w-full mt-4 p-3 rounded-xl text-black"
-         placeholder="Room Code">
+  <!-- WAITING -->
+  <div id="waiting" class="hidden">
+    <h3>Waiting for partner...</h3>
+    <p>Room Code:</p>
+    <h2 id="roomCode"></h2>
+  </div>
 
-  <input id="nameInput" class="w-full mt-4 p-3 rounded-xl text-black"
-         placeholder="Your Name">
+  <!-- GAME -->
+  <div id="game" class="hidden">
+    <h3 id="question"></h3>
+    <button onclick="submitAnswer('A')">Option A</button>
+    <button onclick="submitAnswer('B')">Option B</button>
+  </div>
 
-  <button id="continueBtn"
-          class="w-full mt-4 py-3 bg-white text-black rounded-xl font-bold">
-    Continue
-  </button>
+  <!-- RESULT -->
+  <div id="result" class="hidden">
+    <h3 id="resultText"></h3>
+    <button onclick="nextQuestion()">Next</button>
+  </div>
 
-  <div id="status" class="mt-4 text-sm opacity-80"></div>
-
-  <button id="readyBtn"
-          class="hidden w-full mt-4 py-3 bg-green-500 rounded-xl font-bold">
-    READY
-  </button>
 </div>
 
-<!-- GAME -->
-<canvas id="game" width="900" height="500"
-        class="hidden rounded-xl shadow-2xl"></canvas>
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-<script>
-/* ================== STATE ================== */
-let peer, conn
-let isHost = false
-let localReady = false
-let remoteReady = false
-let remoteAck = false
-let started = false
+/* 🔥 REPLACE WITH YOUR FIREBASE CONFIG */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "XXXX",
+  appId: "XXXX"
+};
 
-/* ================== UI ================== */
-const lobby = document.getElementById("lobby")
-const canvas = document.getElementById("game")
-const ctx = canvas.getContext("2d")
-const status = document.getElementById("status")
-const readyBtn = document.getElementById("readyBtn")
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-/* ================== PLAYERS ================== */
-const me = { x: 200, y: 250, emoji: "🦊" }
-const other = { x: 700, y: 250, emoji: "🐰" }
-const speed = 4
-const keys = {}
+let userId, roomId, role;
+let currentQuestion = 0;
 
-/* ================== BUTTONS ================== */
-hostBtn.onclick = () => {
-  isHost = true
-  roomInput.classList.add("hidden")
-  status.innerText = "Hosting game..."
-}
+const questions = [
+  "How do you handle arguments?",
+  "What matters more: time or money?",
+  "Are you a planner or spontaneous?"
+];
 
-joinBtn.onclick = () => {
-  isHost = false
-  roomInput.classList.remove("hidden")
-  status.innerText = "Joining game..."
-}
+signInAnonymously(auth).then(res => {
+  userId = res.user.uid;
+});
 
-continueBtn.onclick = () => {
-  initPeer()
-}
+window.createRoom = async () => {
+  roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+  role = "playerA";
 
-/* ================== PEER ================== */
-function initPeer() {
-  peer = new Peer()
+  await setDoc(doc(db, "rooms", roomId), {
+    questionIndex: 0,
+    playerA: {},
+    playerB: {},
+    status: "waiting"
+  });
 
-  peer.on("open", id => {
-    if (isHost) {
-      status.innerText = "Room Code: " + id
-    } else {
-      conn = peer.connect(roomInput.value.trim())
-      attachConn()
-    }
-  })
+  document.getElementById("home").classList.add("hidden");
+  document.getElementById("waiting").classList.remove("hidden");
+  document.getElementById("roomCode").innerText = roomId;
 
-  peer.on("connection", c => {
-    if (!conn) {
-      conn = c
-      attachConn()
-    }
-  })
-}
+  listenRoom();
+};
 
-function attachConn() {
-  conn.on("open", () => {
-    status.innerText = "Connected — press READY"
-    readyBtn.classList.remove("hidden")
+window.joinRoom = async () => {
+  roomId = document.getElementById("roomInput").value.trim().toUpperCase();
+  if (!roomId) return alert("Enter room code");
 
-    // 🔑 ACK ensures listener is ready
-    conn.send({ type: "ACK" })
-  })
+  role = "playerB";
+  await updateDoc(doc(db, "rooms", roomId), { status: "ready" });
 
-  conn.on("data", msg => {
-    if (msg.type === "ACK") {
-      remoteAck = true
-      checkStart()
+  document.getElementById("home").classList.add("hidden");
+  document.getElementById("waiting").classList.remove("hidden");
+
+  listenRoom();
+};
+
+function listenRoom() {
+  onSnapshot(doc(db, "rooms", roomId), snap => {
+    const data = snap.data();
+    if (!data) return;
+
+    if (data.status === "ready") {
+      document.getElementById("waiting").classList.add("hidden");
+      document.getElementById("game").classList.remove("hidden");
+      document.getElementById("question").innerText = questions[data.questionIndex];
     }
 
-    if (msg.type === "READY") {
-      remoteReady = true
-      status.innerText = "Other player ready"
-      checkStart()
-    }
+    if (data.playerA.answer && data.playerB.answer) {
+      document.getElementById("game").classList.add("hidden");
+      document.getElementById("result").classList.remove("hidden");
 
-    if (msg.type === "START") {
-      startGame()
+      const match = data.playerA.answer === data.playerB.answer;
+      document.getElementById("resultText").innerText =
+        match ? "💚 Great match!" : "💬 Different views — talk about it!";
     }
-
-    if (msg.type === "MOVE") {
-      other.x = msg.x
-      other.y = msg.y
-    }
-  })
+  });
 }
 
-/* ================== READY ================== */
-readyBtn.onclick = () => {
-  if (localReady) return
+window.submitAnswer = async (ans) => {
+  await updateDoc(doc(db, "rooms", roomId), {
+    [`${role}.answer`]: ans
+  });
+};
 
-  localReady = true
-  readyBtn.disabled = true
-  readyBtn.innerText = "Waiting..."
-  status.innerText = "Waiting for other player..."
+window.nextQuestion = async () => {
+  currentQuestion++;
 
-  conn.send({ type: "READY" })
-  checkStart()
-}
-
-/* ================== START CHECK ================== */
-function checkStart() {
-  if (started) return
-
-  // 🔒 Host is authoritative
-  if (isHost && localReady && remoteReady && remoteAck) {
-    started = true
-    conn.send({ type: "START" })
-    startGame()
+  if (currentQuestion >= questions.length) {
+    alert("Game Over ❤️");
+    location.reload();
+    return;
   }
-}
 
-/* ================== GAME ================== */
-function startGame() {
-  if (started) return
-  started = true
+  await updateDoc(doc(db, "rooms", roomId), {
+    questionIndex: currentQuestion,
+    playerA: {},
+    playerB: {}
+  });
 
-  lobby.classList.add("hidden")
-  canvas.classList.remove("hidden")
-
-  me.emoji = isHost ? "🦊" : "🐰"
-  other.emoji = isHost ? "🐰" : "🦊"
-
-  requestAnimationFrame(gameLoop)
-}
-
-function gameLoop() {
-  update()
-  draw()
-  requestAnimationFrame(gameLoop)
-}
-
-function update() {
-  if (keys["ArrowUp"]) me.y -= speed
-  if (keys["ArrowDown"]) me.y += speed
-  if (keys["ArrowLeft"]) me.x -= speed
-  if (keys["ArrowRight"]) me.x += speed
-
-  conn?.send({ type: "MOVE", x: me.x, y: me.y })
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.font = "60px serif"
-  ctx.textAlign = "center"
-  ctx.textBaseline = "middle"
-
-  ctx.fillText(me.emoji, me.x, me.y)
-  ctx.fillText(other.emoji, other.x, other.y)
-}
-
-/* ================== INPUT ================== */
-window.addEventListener("keydown", e => keys[e.key] = true)
-window.addEventListener("keyup", e => keys[e.key] = false)
+  document.getElementById("result").classList.add("hidden");
+  document.getElementById("game").classList.remove("hidden");
+};
 </script>
 
 </body>
