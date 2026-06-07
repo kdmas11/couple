@@ -3,836 +3,931 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cozy Kitchen - Couples Online & Couch Compatibility Game</title>
+    <title>Cozy Kitchen Baking Challenge - Multiplayer</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Fredoka+One&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Quicksand', sans-serif;
-            background: radial-gradient(circle at center, #fff6f4 0%, #ffe9e3 100%);
-            touch-action: manipulation;
+            background-color: #fdf6e3;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
         }
-        .bubbly-font {
-            font-family: 'Fredoka One', cursive;
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            border-radius: 20px;
+            overflow: hidden;
+            background-color: #2d2321;
         }
-        /* Custom scrollbar to keep layout neat */
-        ::-webkit-scrollbar {
-            width: 8px;
+
+        canvas {
+            display: block;
         }
-        ::-webkit-scrollbar-track {
-            background: #fff0ec;
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(45, 35, 33, 0.95);
+            color: white;
+            z-index: 10;
         }
-        ::-webkit-scrollbar-thumb {
-            background: #ffb4a2;
-            border-radius: 4px;
+
+        .hidden {
+            display: none !important;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ff7e5f, #feb47b);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(255, 126, 95, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 126, 95, 0.6);
+        }
+        
+        .btn-secondary {
+            background: #4a322c;
+            border: 2px solid #feb47b;
+            padding: 12px 24px;
+            border-radius: 30px;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-secondary:hover {
+            background: #5c413a;
+        }
+
+        .stat-bar-container {
+            background: #1e1615;
+            border-radius: 10px;
+            height: 24px;
+            width: 100%;
+            margin: 8px 0 16px 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .stat-bar {
+            height: 100%;
+            transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 10px;
+        }
+
+        .phase-transition {
+            animation: fadeInOut 2s ease-in-out forwards;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: scale(0.9); }
+            20% { opacity: 1; transform: scale(1); }
+            80% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(1.1); pointer-events: none; }
+        }
+        
+        #invite-link {
+            user-select: all;
+            cursor: pointer;
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-between p-4 overflow-x-hidden">
+<body>
 
-<div class="w-full max-w-4xl bg-white/80 backdrop-blur-md shadow-xl rounded-3xl p-6 border-4 border-orange-100 flex-grow flex flex-col justify-between">
-    
-    <header class="text-center mb-4">
-        <h1 class="text-3xl md:text-5xl bubbly-font text-pink-500 drop-shadow-sm flex items-center justify-center gap-2">
-            <span>🧁</span> Cozy Kitchen <span>🧁</span>
-        </h1>
-        <p class="text-sm md:text-base text-gray-600 mt-1">A co-op baking challenge designed to test & enhance relationship compatibility!</p>
-    </header>
+    <div id="game-container" style="width: 800px; height: 600px;">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
 
-    <main class="flex-grow flex flex-col items-center justify-center">
-
-        <div id="setup-screen" class="w-full max-w-2xl space-y-6">
+        <!-- Multiplayer Lobby Screen -->
+        <div id="lobby-screen" class="ui-overlay">
+            <h1 class="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">Cozy Kitchen</h1>
+            <h2 class="text-2xl mb-8">Multiplayer Co-op</h2>
             
-            <div class="flex justify-center bg-pink-100/50 p-1.5 rounded-full border border-pink-200">
-                <button id="btn-mode-local" onclick="selectPlayMode('local')" class="w-1/2 py-2 text-sm font-bold rounded-full transition-all bg-white text-pink-600 shadow-sm">
-                    🖥️ Couch Co-Op (Local)
-                </button>
-                <button id="btn-mode-online" onclick="selectPlayMode('online')" class="w-1/2 py-2 text-sm font-bold rounded-full transition-all text-gray-500 hover:text-pink-500">
-                    🌐 Play Online (Real-time P2P)
-                </button>
+            <div id="loading-auth" class="text-xl text-yellow-400 mb-4 animate-pulse">Connecting to servers...</div>
+
+            <div id="host-controls" class="hidden flex flex-col items-center">
+                <p class="mb-4 text-lg text-gray-300">You are <span class="font-bold text-[#ff8a98]">Player 1 (Host) 🦊</span></p>
+                <div class="bg-[#3e3230] p-4 rounded-lg mb-6 w-96 text-center border border-gray-600">
+                    <p class="text-sm text-gray-400 mb-2">Send this link to Player 2:</p>
+                    <input type="text" id="invite-link" readonly class="w-full bg-[#1e1615] text-white p-2 rounded text-center text-sm border border-gray-700 outline-none" value="Generating...">
+                    <button id="copy-btn" class="mt-3 text-sm bg-gray-700 hover:bg-gray-600 px-4 py-1 rounded">Copy Link</button>
+                </div>
+                <div id="host-status" class="text-yellow-400 mb-6 font-bold animate-pulse">Waiting for Player 2 to join...</div>
+                <button id="start-btn" class="btn-primary hidden">Start Game</button>
             </div>
 
-            <div id="online-lobby-panel" class="hidden bg-pink-50/50 p-5 rounded-2xl border border-pink-100 space-y-4">
-                <h3 class="font-bold text-pink-800 text-sm uppercase tracking-wider text-center">WebRTC Connection Station</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-pink-100 flex flex-col justify-between space-y-3">
-                        <div>
-                            <h4 class="font-bold text-gray-700 text-sm">Option A: Host a Room</h4>
-                            <p class="text-xs text-gray-500">Start a lobby and share your connection key with your partner.</p>
-                        </div>
-                        <div class="flex flex-col gap-2">
-                            <button id="btn-host-room" onclick="hostRoom()" class="text-xs font-bold bg-pink-400 hover:bg-pink-500 text-white py-2 px-4 rounded-lg transition-transform active:scale-95">
-                                🏠 Generate Room Code
-                            </button>
-                            <div id="host-code-display" class="hidden flex items-center justify-between bg-pink-50 p-2 rounded border border-pink-100 text-xs">
-                                <span class="font-mono font-bold text-pink-700" id="txt-room-code">WAITING...</span>
-                                <button onclick="copyRoomCode()" class="text-pink-500 hover:text-pink-700 font-bold px-1.5">Copy 📋</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-pink-100 flex flex-col justify-between space-y-3">
-                        <div>
-                            <h4 class="font-bold text-gray-700 text-sm">Option B: Join a Friend</h4>
-                            <p class="text-xs text-gray-500">Paste the connection key received from your hosting partner.</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <input type="text" id="ipt-room-code" placeholder="Enter Room Code" class="flex-grow text-center text-xs font-mono font-bold border border-gray-300 rounded-lg p-2 focus:outline-pink-400">
-                            <button onclick="joinRoom()" class="text-xs font-bold bg-teal-500 hover:bg-teal-600 text-white py-2 px-4 rounded-lg transition-transform active:scale-95">
-                                🤝 Join Room
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div id="connection-status-pill" class="text-center text-xs font-bold py-1 bg-gray-100 rounded-lg text-gray-500">
-                    Offline Status: Ready to play locally or connect online.
-                </div>
-            </div>
-
-            <div class="bg-amber-50/50 p-5 rounded-2xl border border-amber-100 text-center">
-                <h2 class="text-xl font-bold text-amber-800 mb-1">Configure Your Avatars!</h2>
-                <p id="setup-instruction-txt" class="text-gray-600 text-xs md:text-sm">
-                    Grab your partner, sit close, and get ready to cook. Customize your names and avatars to proceed.
-                </p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div id="card-p1" class="bg-rose-50/50 p-6 rounded-2xl border-2 border-rose-100 flex flex-col items-center space-y-4">
-                    <span class="text-xs font-bold uppercase tracking-wider text-rose-500 bg-rose-100 px-3 py-1 rounded-full">Partner 1 (Left Side)</span>
-                    <input type="text" id="p1-name" oninput="syncLobbyValues()" value="Baker Joy" class="w-full text-center font-semibold bg-white border border-rose-200 rounded-xl px-3 py-2 text-gray-700 focus:outline-rose-400">
-                    
-                    <div class="flex items-center space-x-4">
-                        <button id="p1-carousel-prev" onclick="changeAvatar(1, -1)" class="w-10 h-10 bg-white border-2 border-rose-200 hover:bg-rose-100 rounded-full text-xl flex items-center justify-center transition-transform active:scale-95">◀</button>
-                        <div id="p1-avatar-preview" class="text-6xl select-none filter drop-shadow-md">👩‍🍳</div>
-                        <button id="p1-carousel-next" onclick="changeAvatar(1, 1)" class="w-10 h-10 bg-white border-2 border-rose-200 hover:bg-rose-100 rounded-full text-xl flex items-center justify-center transition-transform active:scale-95">▶</button>
-                    </div>
-                    <p class="text-xs text-gray-500 text-center">Controls: <kbd class="bg-gray-200 px-1 rounded">A</kbd> & <kbd class="bg-gray-200 px-1 rounded">D</kbd> keys or left-side screen controls</p>
-                </div>
-
-                <div id="card-p2" class="bg-teal-50/50 p-6 rounded-2xl border-2 border-teal-100 flex flex-col items-center space-y-4">
-                    <span class="text-xs font-bold uppercase tracking-wider text-teal-600 bg-teal-100 px-3 py-1 rounded-full">Partner 2 (Right Side)</span>
-                    <input type="text" id="p2-name" oninput="syncLobbyValues()" value="Baker Sweet" class="w-full text-center font-semibold bg-white border border-teal-200 rounded-xl px-3 py-2 text-gray-700 focus:outline-teal-400">
-                    
-                    <div class="flex items-center space-x-4">
-                        <button id="p2-carousel-prev" onclick="changeAvatar(2, -1)" class="w-10 h-10 bg-white border-2 border-teal-200 hover:bg-teal-100 rounded-full text-xl flex items-center justify-center transition-transform active:scale-95">◀</button>
-                        <div id="p2-avatar-preview" class="text-6xl select-none filter drop-shadow-md">👨‍🍳</div>
-                        <button id="p2-carousel-next" onclick="changeAvatar(2, 1)" class="w-10 h-10 bg-white border-2 border-teal-200 hover:bg-teal-100 rounded-full text-xl flex items-center justify-center transition-transform active:scale-95">▶</button>
-                    </div>
-                    <p class="text-xs text-gray-500 text-center">Controls: <kbd class="bg-gray-200 px-1 rounded">◀</kbd> & <kbd class="bg-gray-200 px-1 rounded">▶</kbd> arrow keys or right-side screen controls</p>
-                </div>
-            </div>
-
-            <div class="text-center pt-4">
-                <button id="btn-launch" onclick="launchGame()" class="bubbly-font bg-pink-500 hover:bg-pink-600 active:scale-95 text-white text-2xl py-4 px-12 rounded-full shadow-lg transition-transform hover:shadow-pink-300/50 hover:shadow-xl">
-                    Enter Kitchen! 🍕
-                </button>
+            <div id="client-controls" class="hidden flex flex-col items-center">
+                <p class="mb-4 text-lg text-gray-300">You are <span class="font-bold text-[#4db6ac]">Player 2 (Guest) 🐰</span></p>
+                <div id="client-status" class="text-green-400 mb-6 font-bold">Connected! Waiting for Host to start...</div>
             </div>
         </div>
 
-        <div id="game-screen" class="hidden w-full flex flex-col items-center space-y-4">
+        <!-- Setup/Controls Screen -->
+        <div id="setup-screen" class="ui-overlay hidden">
+            <h2 class="text-3xl font-bold mb-8">Your Controls</h2>
             
-            <div class="w-full flex justify-between items-center bg-pink-50/60 border border-pink-100 p-3 rounded-2xl text-xs md:text-sm">
-                <div class="flex items-center gap-2">
-                    <span id="p1-badge" class="text-xl">👩‍🍳</span>
-                    <div>
-                        <p class="font-bold text-rose-700" id="p1-hud-name">Partner 1</p>
-                        <p class="text-gray-500" id="p1-controller-desc">Left Controller</p>
-                    </div>
+            <div class="flex gap-8 mb-8" id="controls-display">
+                <!-- Injected via JS based on role -->
+            </div>
+
+            <p class="text-yellow-400 mt-4 animate-pulse">Game starting in a moment...</p>
+        </div>
+
+        <!-- Phase Transition Announcement -->
+        <div id="phase-announcer" class="ui-overlay hidden bg-transparent pointer-events-none">
+            <h1 id="phase-title" class="text-6xl font-bold text-center text-white drop-shadow-lg"></h1>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="results-screen" class="ui-overlay hidden p-8 overflow-y-auto">
+            <h1 class="text-4xl font-bold mb-2 text-yellow-400">Baking Complete!</h1>
+            <h2 id="archetype-title" class="text-2xl font-bold mb-4"></h2>
+            <p id="archetype-desc" class="text-center max-w-lg mb-6 text-gray-300"></p>
+            
+            <div class="w-full max-w-md bg-[#3e3230] p-6 rounded-xl shadow-lg">
+                <div class="text-center mb-4">
+                    <span class="text-gray-400 uppercase tracking-wide text-sm">Overall Synergy</span>
+                    <div id="score-percentage" class="text-5xl font-bold text-white mt-1">0%</div>
                 </div>
                 
-                <div class="text-center">
-                    <span id="game-phase-indicator" class="font-bold text-pink-600 bg-white border border-pink-200 px-4 py-1.5 rounded-full shadow-sm text-sm">
-                        Phase 1: Catch Ingredients
-                    </span>
-                    <p class="text-gray-400 text-[10px] mt-1">Work Together to fill the score bar!</p>
-                </div>
-
-                <div class="flex items-center gap-2 text-right">
-                    <div>
-                        <p class="font-bold text-teal-700" id="p2-hud-name">Partner 2</p>
-                        <p class="text-gray-500" id="p2-controller-desc">Right Controller</p>
+                <div class="text-left mt-6">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span>Phase 1: Gathering Sync</span>
+                        <span id="stat-gathering" class="font-bold">0%</span>
                     </div>
-                    <span id="p2-badge" class="text-xl">👨‍🍳</span>
-                </div>
-            </div>
+                    <div class="stat-bar-container"><div id="bar-gathering" class="stat-bar bg-green-400" style="width: 0%;"></div></div>
 
-            <div class="relative w-full max-w-3xl aspect-[16/9] bg-slate-900 rounded-2xl overflow-hidden border-4 border-amber-900/10 shadow-inner">
-                <canvas id="cookingCanvas" class="w-full h-full block bg-gradient-to-b from-orange-50 to-orange-100"></canvas>
-                
-                <div id="canvas-overlay" class="absolute inset-0 bg-black/65 flex flex-col items-center justify-center text-center p-6 transition-opacity duration-300">
-                    <h3 id="overlay-title" class="bubbly-font text-white text-2xl md:text-4xl mb-2 text-pink-400">Get Ready!</h3>
-                    <p id="overlay-desc" class="text-white/90 max-w-md text-sm md:text-base mb-6">Instruction text goes here...</p>
-                    <button id="overlay-btn" onclick="startCurrentPhase()" class="bubbly-font bg-pink-500 hover:bg-pink-600 text-white text-lg py-3 px-8 rounded-full transition-all active:scale-95 shadow-lg">
-                        We are ready! Let's go
-                    </button>
-                </div>
-            </div>
-
-            <div class="w-full grid grid-cols-2 gap-4 pt-2">
-                <div id="ctrl-p1-panel" class="flex justify-around items-center bg-rose-50/50 p-3 rounded-2xl border border-rose-100 select-none">
-                    <button id="btn-p1-left" class="w-14 h-14 bg-white active:bg-rose-200 rounded-2xl border-2 border-rose-200 shadow-md flex items-center justify-center text-2xl transition-transform active:scale-90 text-rose-600">◀</button>
-                    <div class="text-center">
-                        <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider block">P1 Action</span>
-                        <button id="btn-p1-action" class="mt-1 w-16 h-12 bg-rose-400 active:bg-rose-600 text-white font-bold rounded-full shadow-md text-xs uppercase flex items-center justify-center transition-all active:scale-95">STIR</button>
+                    <div class="flex justify-between text-sm mb-1 mt-4">
+                        <span>Phase 2: Whipping Sync</span>
+                        <span id="stat-sync" class="font-bold">0%</span>
                     </div>
-                    <button id="btn-p1-right" class="w-14 h-14 bg-white active:bg-rose-200 rounded-2xl border-2 border-rose-200 shadow-md flex items-center justify-center text-2xl transition-transform active:scale-90 text-rose-600">▶</button>
-                </div>
+                    <div class="stat-bar-container"><div id="bar-sync" class="stat-bar bg-blue-400" style="width: 0%;"></div></div>
 
-                <div id="ctrl-p2-panel" class="flex justify-around items-center bg-teal-50/50 p-3 rounded-2xl border border-teal-100 select-none">
-                    <button id="btn-p2-left" class="w-14 h-14 bg-white active:bg-teal-200 rounded-2xl border-2 border-teal-200 shadow-md flex items-center justify-center text-2xl transition-transform active:scale-90 text-teal-600">◀</button>
-                    <div class="text-center">
-                        <span class="text-[10px] font-bold text-teal-400 uppercase tracking-wider block">P2 Action</span>
-                        <button id="btn-p2-action" class="mt-1 w-16 h-12 bg-teal-400 active:bg-teal-600 text-white font-bold rounded-full shadow-md text-xs uppercase flex items-center justify-center transition-all active:scale-95">STIR</button>
+                    <div class="flex justify-between text-sm mb-1 mt-4">
+                        <span>Phase 3: Oven Balance</span>
+                        <span id="stat-balance" class="font-bold">0%</span>
                     </div>
-                    <button id="btn-p2-right" class="w-14 h-14 bg-white active:bg-teal-200 rounded-2xl border-2 border-teal-200 shadow-md flex items-center justify-center text-2xl transition-transform active:scale-90 text-teal-600">▶</button>
+                    <div class="stat-bar-container"><div id="bar-balance" class="stat-bar bg-orange-400" style="width: 0%;"></div></div>
                 </div>
             </div>
-
-            <div class="text-center text-xs text-gray-400">
-                Tip: Share screen and enjoy! Communicate verbally to coordinate timing.
-            </div>
+            
+            <p class="mt-8 text-gray-400">Refresh the page to start a new session.</p>
         </div>
+    </div>
 
-        <div id="results-screen" class="hidden w-full max-w-2xl space-y-6">
-            <div class="text-center">
-                <span class="text-6xl">🎂💖🎉</span>
-                <h2 class="text-3xl md:text-4xl bubbly-font text-pink-500 mt-3">The Cake is Baked!</h2>
-                <p class="text-gray-500 text-sm md:text-base mt-1">Here is a report of how you performed as co-bakers and partners.</p>
-            </div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-            <div class="bg-pink-50/30 p-6 rounded-3xl border-2 border-pink-100 space-y-6">
-                <div class="flex flex-col md:flex-row items-center justify-around gap-6">
-                    <div class="relative w-36 h-36 flex items-center justify-center bg-white rounded-full shadow-lg border-4 border-pink-200">
-                        <div class="text-center">
-                            <span id="score-percentage" class="bubbly-font text-4xl text-pink-500">85%</span>
-                            <span class="text-[10px] block font-bold text-gray-400 uppercase tracking-wide">Synergy Match</span>
-                        </div>
-                    </div>
-                    
-                    <div class="flex-grow space-y-3 max-w-sm">
-                        <h4 class="font-bold text-lg text-rose-800">Your Co-Op Relationship Archetype:</h4>
-                        <p id="archetype-title" class="font-semibold text-pink-600">Perfect Rhythm Partners</p>
-                        <p id="archetype-desc" class="text-xs text-gray-600 leading-relaxed">
-                            You work incredibly well in structured coordination. You understand when to hold back and when to lean in, making you strong collaborators.
-                        </p>
-                    </div>
-                </div>
+        // Firebase Configuration (Injected by environment)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-kitchen-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-                <hr class="border-pink-100">
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-                <div class="space-y-3">
-                    <h4 class="font-bold text-sm text-pink-800 uppercase tracking-widest">Pillar Breakdown</h4>
-                    
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs font-semibold text-gray-600">
-                            <span>🤝 Ingredient Gathering (Teamwork)</span>
-                            <span id="stat-gathering">80%</span>
-                        </div>
-                        <div class="h-2 w-full bg-pink-100 rounded-full overflow-hidden">
-                            <div id="bar-gathering" class="h-full bg-pink-400 transition-all duration-1000" style="width: 80%"></div>
-                        </div>
-                    </div>
+        // Multiplayer State Variables
+        let isHost = true;
+        let sessionId = null;
+        let userId = null;
+        let sessionRef = null;
+        let p2RemoteInput = { left: false, right: false, up: false };
+        let lastSyncTime = 0;
+        const SYNC_RATE_MS = 50; // Sync game state 20 times per second
 
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs font-semibold text-gray-600">
-                            <span>💓 Whip Whisking (Synchronization)</span>
-                            <span id="stat-sync">90%</span>
-                        </div>
-                        <div class="h-2 w-full bg-pink-100 rounded-full overflow-hidden">
-                            <div id="bar-sync" class="h-full bg-pink-400 transition-all duration-1000" style="width: 90%"></div>
-                        </div>
-                    </div>
+        // Canvas & Local Game Setup
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const W = canvas.width;
+        const H = canvas.height;
 
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs font-semibold text-gray-600">
-                            <span>⚖️ Temperature Control (Balance)</span>
-                            <span id="stat-balance">85%</span>
-                        </div>
-                        <div class="h-2 w-full bg-pink-100 rounded-full overflow-hidden">
-                            <div id="bar-balance" class="h-full bg-pink-400 transition-all duration-1000" style="width: 85%"></div>
-                        </div>
-                    </div>
-                </div>
+        const keys = {};
+        window.addEventListener("keydown", (e) => keys[e.key.toLowerCase()] = true);
+        window.addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
 
-                <hr class="border-pink-100">
+        // UI Elements
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const hostControls = document.getElementById('host-controls');
+        const clientControls = document.getElementById('client-controls');
+        const loadingAuth = document.getElementById('loading-auth');
+        const inviteLinkInput = document.getElementById('invite-link');
+        const hostStatus = document.getElementById('host-status');
+        const startBtn = document.getElementById('start-btn');
+        const setupScreen = document.getElementById('setup-screen');
 
-                <div class="bg-white/80 p-5 rounded-2xl border border-pink-100/50 space-y-3">
-                    <h4 class="font-bold text-sm text-pink-800 flex items-center gap-1">
-                        💬 Conversational Spark Prompts
-                    </h4>
-                    <p class="text-xs text-gray-500">Take a moment to discuss these short questions together on the couch:</p>
-                    <ul class="text-xs text-gray-700 list-disc list-inside space-y-2">
-                        <li>Who naturally took the lead in balancing the oven, and how does that match real-world household decisions?</li>
-                        <li>Was catching ingredients easy to communicate, or did you accidentally crowd each other's spaces?</li>
-                        <li>How can we bring this dynamic of 'rhythm and sync' to our daily routines?</li>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <button onclick="resetSetup()" class="bubbly-font bg-pink-500 hover:bg-pink-600 active:scale-95 text-white py-3 px-8 rounded-full shadow-md transition-all">
-                    Bake Another Recipe 🍳
-                </button>
-                <button onclick="shareResults()" class="bubbly-font bg-teal-500 hover:bg-teal-600 active:scale-95 text-white py-3 px-8 rounded-full shadow-md transition-all">
-                    Copy Results to Clipboard 📋
-                </button>
-            </div>
-        </div>
-
-    </main>
-
-    <footer class="text-center text-xs text-gray-400 border-t border-gray-100 pt-4 mt-4">
-        Made with ❤️ for gaming couples. Remember, a burnt cake is just an excuse to bake another!
-    </footer>
-</div>
-
-<script>
-    const AVATARS = [
-        "👩‍🍳", "👨‍🍳", "🧑‍🍳", "🐱‍🍳", "🐼", "🦊", "🐰", "🐨", "🦁"
-    ];
-
-    let player1Index = 0;
-    let player2Index = 1;
-
-    let p1Name = "Baker Joy";
-    let p2Name = "Baker Sweet";
-
-    // Play Mode Core Configuration
-    let playMode = "local"; // 'local' or 'online'
-    let isHost = false;
-    let isConnected = false;
-    let peerInstance = null;
-    let activeConnection = null;
-
-    // Game Core State
-    let canvas = document.getElementById("cookingCanvas");
-    let ctx = canvas.getContext("2d");
-
-    let animationFrameId;
-    let gamePhase = 1; // 1: Gathering, 2: Whipping, 3: Balancing, 4: Finished
-    let phaseActive = false;
-
-    // Couple statistics we will accumulate to measure compatibility
-    let stats = {
-        gatheringScore: 0,
-        gatheringMisses: 0,
-        whippingPerfectSyncs: 0,
-        whippingAttempts: 0,
-        balancePerfectSecs: 0,
-        balanceTotalSecs: 0,
-        totalErrors: 0
-    };
-
-    // Shared game state logic
-    let gameState = {
-        p1: { x: 0.3 }, // % of canvas
-        p2: { x: 0.7 },
-        items: [], // falling items
-        whiskL: false, whiskR: false, whiskAmt: 0,
-        heat: 50,
-        timer: 0
-    };
-
-    // Keyboard Tracking
-    const keys = {};
-    window.addEventListener("keydown", (e) => {
-        keys[e.key.toLowerCase()] = true;
-        if (playMode === "online" && !isHost && activeConnection) {
-            sendClientInputs();
-        }
-        if (["arrowleft", "arrowright", "arrowup", "arrowdown", " "].includes(e.key.toLowerCase())) {
-            e.preventDefault();
-        }
-    });
-    window.addEventListener("keyup", (e) => {
-        keys[e.key.toLowerCase()] = false;
-        if (playMode === "online" && !isHost && activeConnection) {
-            sendClientInputs();
-        }
-    });
-
-    // Touch Button Tracking
-    const touchStates = {
-        p1Left: false, p1Right: false,
-        p2Left: false, p2Right: false,
-        p1Action: false, p2Action: false
-    };
-
-    function bindTouchBtn(elementId, stateProp) {
-        const btn = document.getElementById(elementId);
-        if (!btn) return;
-
-        const setPressed = (val) => {
-            touchStates[stateProp] = val;
-            if (playMode === "online" && !isHost && activeConnection) {
-                sendClientInputs();
+        // Global Game State Structure
+        let gameState = {
+            phase: 0, // 0: Lobby, 1: Gather, 2: Whip, 3: Bake, 4: Results
+            timer: 20,
+            p1: { x: W * 0.25, score: 0, wPressed: false },
+            p2: { x: W * 0.75, score: 0, upPressed: false },
+            items: [], // {x, y, emoji, speed}
+            whipScale: 1.0,
+            whipFeedback: "",
+            phase2Hits: 0,
+            ovenTemp: 50,
+            balanceTimeSec: 0,
+            stats: {
+                gatheringScore: 0, gatheringMisses: 0, 
+                whippingAttempts: 0, whippingPerfectSyncs: 0, 
+                balancePerfectSecs: 0, balanceTotalSecs: 0
             }
         };
 
-        btn.addEventListener("touchstart", (e) => { e.preventDefault(); setPressed(true); });
-        btn.addEventListener("touchend", (e) => { e.preventDefault(); setPressed(false); });
-        btn.addEventListener("mousedown", () => setPressed(true));
-        btn.addEventListener("mouseup", () => setPressed(false));
-        btn.addEventListener("mouseleave", () => setPressed(false));
-    }
+        const AVATARS = ["🦊", "🐰"];
+        const itemsList = ["🍓", "🍫", "🥛", "🥚", "🧈", "🍋", "🫐"];
+        let particles = [];
+        let whipDirection = 1;
+        let feedbackAlpha = 0;
+        let p1HeatCooldown = 0;
+        let p2CoolCooldown = 0;
+        let lastLocalUpdate = Date.now();
+        let animationFrameId;
 
-    bindTouchBtn("btn-p1-left", "p1Left");
-    bindTouchBtn("btn-p1-right", "p1Right");
-    bindTouchBtn("btn-p2-left", "p2Left");
-    bindTouchBtn("btn-p2-right", "p2Right");
-
-    // Single Taps for actions
-    document.getElementById("btn-p1-action").addEventListener("mousedown", () => handleActionTap(1));
-    document.getElementById("btn-p1-action").addEventListener("touchstart", (e) => { e.preventDefault(); handleActionTap(1); });
-    document.getElementById("btn-p2-action").addEventListener("mousedown", () => handleActionTap(2));
-    document.getElementById("btn-p2-action").addEventListener("touchstart", (e) => { e.preventDefault(); handleActionTap(2); });
-
-    function handleActionTap(playerNum) {
-        if (playMode === "online" && !isHost) {
-            if (activeConnection) {
-                activeConnection.send({ type: "CLIENT_TAP", player: playerNum });
-            }
-            return;
-        }
-
-        if (!phaseActive) return;
-        if (gamePhase === 2) {
-            handleWhipPress(playerNum);
-        } else if (gamePhase === 3) {
-            handleOvenPress(playerNum);
-        }
-    }
-
-    function selectPlayMode(mode) {
-        playMode = mode;
-        const btnLocal = document.getElementById("btn-mode-local");
-        const btnOnline = document.getElementById("btn-mode-online");
-        const onlinePanel = document.getElementById("online-lobby-panel");
-
-        if (mode === "local") {
-            btnLocal.className = "w-1/2 py-2 text-sm font-bold rounded-full transition-all bg-white text-pink-600 shadow-sm";
-            btnOnline.className = "w-1/2 py-2 text-sm font-bold rounded-full transition-all text-gray-500 hover:text-pink-500";
-            onlinePanel.classList.add("hidden");
-            enableControls(true, true);
-            document.getElementById("setup-instruction-txt").innerText = "Grab your partner, sit close, and get ready to cook. Customize names & avatars below.";
-        } else {
-            btnOnline.className = "w-1/2 py-2 text-sm font-bold rounded-full transition-all bg-white text-pink-600 shadow-sm";
-            btnLocal.className = "w-1/2 py-2 text-sm font-bold rounded-full transition-all text-gray-500 hover:text-pink-500";
-            onlinePanel.classList.remove("hidden");
-            document.getElementById("setup-instruction-txt").innerText = "One player hosts, while the other joins via Room Code. Host moves as Partner 1; Joiner moves as Partner 2.";
-        }
-    }
-
-    function enableControls(p1Enabled, p2Enabled) {
-        document.getElementById("p1-name").disabled = !p1Enabled;
-        document.getElementById("p2-name").disabled = !p2Enabled;
-        document.getElementById("p1-carousel-prev").disabled = !p1Enabled;
-        document.getElementById("p1-carousel-next").disabled = !p1Enabled;
-        document.getElementById("p2-carousel-prev").disabled = !p2Enabled;
-        document.getElementById("p2-carousel-next").disabled = !p2Enabled;
-    }
-
-    function changeAvatar(player, dir) {
-        if (player === 1) {
-            player1Index = (player1Index + dir + AVATARS.length) % AVATARS.length;
-            document.getElementById("p1-avatar-preview").innerText = AVATARS[player1Index];
-        } else {
-            player2Index = (player2Index + dir + AVATARS.length) % AVATARS.length;
-            document.getElementById("p2-avatar-preview").innerText = AVATARS[player2Index];
-        }
-        syncLobbyValues();
-    }
-
-    function syncLobbyValues() {
-        p1Name = document.getElementById("p1-name").value;
-        p2Name = document.getElementById("p2-name").value;
-        if (playMode === "online" && activeConnection) {
-            activeConnection.send({
-                type: "LOBBY_SYNC",
-                p1Name, p1Index: player1Index,
-                p2Name, p2Index: player2Index
-            });
-        }
-    }
-
-    function copyRoomCode() {
-        const code = document.getElementById("txt-room-code").innerText;
-        navigator.clipboard.writeText(code);
-        alert("Room Code Copied!");
-    }
-
-    function hostRoom() {
-        document.getElementById("connection-status-pill").innerText = "Initializing Peer Engine...";
-        document.getElementById("connection-status-pill").className = "text-center text-xs font-bold py-1 bg-amber-100 rounded-lg text-amber-600";
-
-        peerInstance = new Peer();
-        
-        peerInstance.on("open", (id) => {
-            isHost = true;
-            document.getElementById("txt-room-code").innerText = id;
-            document.getElementById("host-code-display").classList.remove("hidden");
-            document.getElementById("connection-status-pill").innerText = "Room Created! Share Room Code. Waiting for Partner...";
-            enableControls(true, false);
-        });
-
-        peerInstance.on("connection", (conn) => {
-            activeConnection = conn;
-            setupActiveConnection();
-        });
-
-        peerInstance.on("error", (err) => {
-            document.getElementById("connection-status-pill").innerText = "P2P Error: " + err.message;
-            document.getElementById("connection-status-pill").className = "text-center text-xs font-bold py-1 bg-rose-100 rounded-lg text-rose-600";
-        });
-    }
-
-    function joinRoom() {
-        const joinId = document.getElementById("ipt-room-code").value.trim();
-        if (!joinId) return alert("Please enter a valid Host Room Code.");
-
-        document.getElementById("connection-status-pill").innerText = "Connecting to Host Room...";
-        document.getElementById("connection-status-pill").className = "text-center text-xs font-bold py-1 bg-amber-100 rounded-lg text-amber-600";
-
-        peerInstance = new Peer();
-
-        peerInstance.on("open", (id) => {
-            isHost = false;
-            activeConnection = peerInstance.connect(joinId);
-            setupActiveConnection();
-        });
-
-        peerInstance.on("error", (err) => {
-            document.getElementById("connection-status-pill").innerText = "Join Connection Failed. Verify Code.";
-            document.getElementById("connection-status-pill").className = "text-center text-xs font-bold py-1 bg-rose-100 rounded-lg text-rose-600";
-        });
-    }
-
-    function setupActiveConnection() {
-        isConnected = true;
-        document.getElementById("connection-status-pill").innerText = "Connected Successfully! Ready to Bake.";
-        document.getElementById("connection-status-pill").className = "text-center text-xs font-bold py-1 bg-emerald-100 rounded-lg text-emerald-700";
-
-        if (!isHost) enableControls(false, true);
-        syncLobbyValues();
-
-        activeConnection.on("data", (data) => {
-            if (data.type === "LOBBY_SYNC") {
-                if (isHost) {
-                    p2Name = data.p2Name; player2Index = data.p2Index;
-                    document.getElementById("p2-name").value = p2Name;
-                    document.getElementById("p2-avatar-preview").innerText = AVATARS[player2Index];
+        async function initMultiplayer() {
+            try {
+                if (authToken) {
+                    await signInWithCustomToken(auth, authToken);
                 } else {
-                    p1Name = data.p1Name; player1Index = data.p1Index;
-                    document.getElementById("p1-name").value = p1Name;
-                    document.getElementById("p1-avatar-preview").innerText = AVATARS[player1Index];
+                    await signInAnonymously(auth);
                 }
-            } else if (data.type === "CLIENT_INPUT") {
-                if (isHost) {
-                    touchStates.p2Left = data.touch.p2Left;
-                    touchStates.p2Right = data.touch.p2Right;
-                    keys["arrowleft"] = data.keys.arrowleft;
-                    keys["arrowright"] = data.keys.arrowright;
+                
+                userId = auth.currentUser.uid;
+                loadingAuth.classList.add('hidden');
+
+                // Check URL for session invite
+                const urlParams = new URLSearchParams(window.location.search);
+                const joinSessionId = urlParams.get('session');
+
+                if (joinSessionId) {
+                    // We are the Client
+                    isHost = false;
+                    sessionId = joinSessionId;
+                    clientControls.classList.remove('hidden');
+                    setupClientSession();
+                } else {
+                    // We are the Host
+                    isHost = true;
+                    // Generate a short readable session ID
+                    sessionId = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    hostControls.classList.remove('hidden');
+                    
+                    const inviteUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
+                    inviteLinkInput.value = inviteUrl;
+                    
+                    document.getElementById('copy-btn').addEventListener('click', () => {
+                        navigator.clipboard.writeText(inviteUrl).then(() => {
+                            document.getElementById('copy-btn').innerText = "Copied!";
+                            setTimeout(() => document.getElementById('copy-btn').innerText = "Copy Link", 2000);
+                        }).catch(err => {
+                            // Fallback
+                            inviteLinkInput.select();
+                            document.execCommand('copy');
+                        });
+                    });
+
+                    setupHostSession();
                 }
-            } else if (data.type === "CLIENT_TAP" && isHost) {
-                handleActionTap(data.player);
-            } else if (data.type === "GAME_START" && !isHost) {
-                launchGameLocal();
-            } else if (data.type === "PHASE_START" && !isHost) {
-                startPhaseLocal(data.phase);
-            } else if (data.type === "HOST_STATE_SYNC" && !isHost) {
-                gameState = data.state;
-                stats = data.stats;
-                gamePhase = data.phase;
-                phaseActive = data.phaseActive;
-            } else if (data.type === "GAME_OVER" && !isHost) {
-                stats = data.stats;
-                showResults();
-            }
-        });
-    }
-
-    function sendClientInputs() {
-        if (playMode === "online" && !isHost && activeConnection) {
-            activeConnection.send({
-                type: "CLIENT_INPUT",
-                touch: { p2Left: touchStates.p2Left, p2Right: touchStates.p2Right },
-                keys: { arrowleft: keys["arrowleft"], arrowright: keys["arrowright"] }
-            });
-        }
-    }
-
-    // Launch & Canvas Initialization
-    function launchGame() {
-        if (playMode === "online" && !isHost) return alert("Waiting for Host to start the game...");
-        if (playMode === "online" && isHost && activeConnection) {
-            activeConnection.send({ type: "GAME_START" });
-        }
-        launchGameLocal();
-    }
-
-    function launchGameLocal() {
-        document.getElementById("setup-screen").classList.add("hidden");
-        document.getElementById("game-screen").classList.remove("hidden");
-        
-        document.getElementById("p1-badge").innerText = AVATARS[player1Index];
-        document.getElementById("p1-hud-name").innerText = p1Name;
-        document.getElementById("p2-badge").innerText = AVATARS[player2Index];
-        document.getElementById("p2-hud-name").innerText = p2Name;
-
-        resizeCanvas();
-        window.addEventListener("resize", resizeCanvas);
-        
-        if (playMode === "local" || isHost) {
-            gameLoop();
-        } else {
-            clientRenderLoop(); // For joined players, just render received host state
-        }
-        preparePhase(1);
-    }
-
-    function resizeCanvas() {
-        const container = canvas.parentElement;
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
-    }
-
-    // --- GAME PHASES LOGIC ---
-
-    function preparePhase(phase) {
-        gamePhase = phase;
-        phaseActive = false;
-        let title = "", desc = "", p1Btn = "---", p2Btn = "---";
-
-        if (phase === 1) {
-            title = "Phase 1: Catch Ingredients!";
-            desc = "Move left/right to catch falling ingredients. Don't catch the trash! P1 uses A/D, P2 uses Arrows.";
-        } else if (phase === 2) {
-            title = "Phase 2: Sync Whisking!";
-            desc = "Tap 'WHISK' repeatedly! Keep your rhythms perfectly synchronized to fill the bowl.";
-            p1Btn = "WHISK"; p2Btn = "WHISK";
-        } else if (phase === 3) {
-            title = "Phase 3: Balance Heat!";
-            desc = "P1 cools the oven (COOL), P2 warms it (HEAT). Keep the dial in the green zone!";
-            p1Btn = "COOL"; p2Btn = "HEAT";
-        }
-
-        document.getElementById("overlay-title").innerText = title;
-        document.getElementById("overlay-desc").innerText = desc;
-        document.getElementById("game-phase-indicator").innerText = title;
-        document.getElementById("btn-p1-action").innerText = p1Btn;
-        document.getElementById("btn-p2-action").innerText = p2Btn;
-
-        if (playMode === "online" && !isHost) {
-            document.getElementById("overlay-btn").style.display = "none";
-            document.getElementById("overlay-desc").innerText += "\n(Waiting for Host...)";
-        } else {
-            document.getElementById("overlay-btn").style.display = "inline-block";
-        }
-        
-        document.getElementById("canvas-overlay").classList.remove("hidden");
-    }
-
-    function startCurrentPhase() {
-        if (playMode === "online" && isHost && activeConnection) {
-            activeConnection.send({ type: "PHASE_START", phase: gamePhase });
-        }
-        startPhaseLocal(gamePhase);
-    }
-
-    function startPhaseLocal(phase) {
-        document.getElementById("canvas-overlay").classList.add("hidden");
-        phaseActive = true;
-        if (phase === 1) { gameState.timer = 1500; gameState.items = []; }
-        if (phase === 2) { gameState.timer = 1000; gameState.whiskAmt = 0; }
-        if (phase === 3) { gameState.timer = 1000; gameState.heat = 50; }
-    }
-
-    // Phase Input Handlers
-    function handleWhipPress(pNum) {
-        if(pNum === 1) gameState.whiskL = true;
-        if(pNum === 2) gameState.whiskR = true;
-        stats.whippingAttempts++;
-        if (gameState.whiskL && gameState.whiskR) {
-            gameState.whiskAmt += 5;
-            stats.whippingPerfectSyncs++;
-            gameState.whiskL = false; gameState.whiskR = false;
-        }
-    }
-
-    function handleOvenPress(pNum) {
-        if(pNum === 1) gameState.heat -= 3;
-        if(pNum === 2) gameState.heat += 3;
-    }
-
-    // Loop for Host / Local
-    function gameLoop() {
-        if (phaseActive) {
-            // Player Movement
-            if (keys['a'] || touchStates.p1Left) gameState.p1.x = Math.max(0.05, gameState.p1.x - 0.01);
-            if (keys['d'] || touchStates.p1Right) gameState.p1.x = Math.min(0.45, gameState.p1.x + 0.01);
-            if (keys['arrowleft'] || touchStates.p2Left) gameState.p2.x = Math.max(0.55, gameState.p2.x - 0.01);
-            if (keys['arrowright'] || touchStates.p2Right) gameState.p2.x = Math.min(0.95, gameState.p2.x + 0.01);
-
-            gameState.timer--;
-
-            if (gamePhase === 1) {
-                // Spawn Items
-                if (Math.random() < 0.03) {
-                    gameState.items.push({ x: Math.random(), y: 0, bad: Math.random() < 0.3 });
-                }
-                // Update Items
-                gameState.items.forEach((item, i) => {
-                    item.y += 0.005;
-                    // Collision
-                    if (item.y > 0.8) {
-                        let hitP1 = Math.abs(item.x - gameState.p1.x) < 0.1;
-                        let hitP2 = Math.abs(item.x - gameState.p2.x) < 0.1;
-                        if (hitP1 || hitP2) {
-                            if (item.bad) stats.gatheringMisses++; else stats.gatheringScore++;
-                            gameState.items.splice(i, 1);
-                        }
-                    }
-                });
-                gameState.items = gameState.items.filter(i => i.y < 1);
-            } 
-            else if (gamePhase === 2) {
-                // Auto decay sync windows
-                if(Math.random() < 0.05) { gameState.whiskL = false; gameState.whiskR = false; }
-            } 
-            else if (gamePhase === 3) {
-                // Heat fluctuates randomly, aim for 40-60
-                gameState.heat += (Math.random() - 0.5) * 1.5;
-                if (gameState.heat >= 40 && gameState.heat <= 60) stats.balancePerfectSecs++;
-                stats.balanceTotalSecs++;
-            }
-
-            // End Phase Trigger
-            if (gameState.timer <= 0) {
-                phaseActive = false;
-                if (gamePhase === 1) preparePhase(2);
-                else if (gamePhase === 2) preparePhase(3);
-                else finishGame();
+            } catch (error) {
+                console.error("Auth error:", error);
+                loadingAuth.innerText = "Connection error. Please refresh.";
             }
         }
 
-        drawState();
-
-        if (playMode === "online" && isHost && activeConnection) {
-            activeConnection.send({
-                type: "HOST_STATE_SYNC",
-                state: gameState, stats: stats, phase: gamePhase, phaseActive: phaseActive
-            });
-        }
-        animationFrameId = requestAnimationFrame(gameLoop);
-    }
-
-    // Loop for Client (Just renders what host sends)
-    function clientRenderLoop() {
-        drawState();
-        animationFrameId = requestAnimationFrame(clientRenderLoop);
-    }
-
-    // Rendering Physics to Canvas
-    function drawState() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        const w = canvas.width;
-        const h = canvas.height;
-
-        // Draw Divider
-        ctx.fillStyle = "rgba(0,0,0,0.1)";
-        ctx.fillRect(w/2 - 2, 0, 4, h);
-
-        // Draw Players
-        ctx.font = `${Math.min(w*0.08, 60)}px Arial`;
-        ctx.textAlign = "center";
-        ctx.fillText(AVATARS[player1Index], gameState.p1.x * w, h * 0.9);
-        ctx.fillText(AVATARS[player2Index], gameState.p2.x * w, h * 0.9);
-
-        if (gamePhase === 1 && phaseActive) {
-            ctx.font = `${Math.min(w*0.05, 40)}px Arial`;
-            gameState.items.forEach(item => {
-                ctx.fillText(item.bad ? "🧦" : "🍓", item.x * w, item.y * h);
-            });
-        }
-        else if (gamePhase === 2 && phaseActive) {
-            // Draw Bowl & Whisk Bar
-            ctx.fillStyle = "#fff";
-            ctx.fillRect(w*0.3, h*0.4, w*0.4, h*0.1);
-            ctx.fillStyle = "pink";
-            ctx.fillRect(w*0.3, h*0.4, (w*0.4) * Math.min(1, gameState.whiskAmt/100), h*0.1);
-            ctx.strokeRect(w*0.3, h*0.4, w*0.4, h*0.1);
-            ctx.fillStyle = "#000";
-            ctx.fillText("Bowl Mix Level", w/2, h*0.35);
-        }
-        else if (gamePhase === 3 && phaseActive) {
-            // Draw Heat Gauge
-            ctx.fillStyle = "red";
-            ctx.fillRect(w*0.2, h*0.4, w*0.6, h*0.1);
-            ctx.fillStyle = "green"; // Sweet spot
-            ctx.fillRect(w*0.4, h*0.4, w*0.2, h*0.1);
+        async function setupHostSession() {
+            if (!userId) return;
+            // RULE 1: STRICT PATHS
+            sessionRef = doc(db, 'artifacts', appId, 'public', 'data', 'kitchenSessions', sessionId);
             
-            // Pointer
-            ctx.fillStyle = "black";
-            let pointerX = w * 0.2 + (w * 0.6) * (Math.max(0, Math.min(100, gameState.heat)) / 100);
+            // Initialize Game State in DB
+            await setDoc(sessionRef, {
+                gameState: gameState,
+                clientJoined: false,
+                p2Input: { left: false, right: false, up: false }
+            });
+
+            // Listen for client joining and input
+            onSnapshot(sessionRef, (docSnap) => {
+                if (!docSnap.exists()) return;
+                const data = docSnap.data();
+                
+                if (data.clientJoined && gameState.phase === 0) {
+                    hostStatus.innerText = "Player 2 joined! Ready to bake.";
+                    hostStatus.classList.remove('animate-pulse');
+                    hostStatus.classList.replace('text-yellow-400', 'text-green-400');
+                    startBtn.classList.remove('hidden');
+                }
+
+                // Constantly update remote P2 input
+                if (data.p2Input) {
+                    p2RemoteInput = data.p2Input;
+                }
+            }, (error) => console.error("Host Snapshot error:", error));
+
+            startBtn.addEventListener('click', () => {
+                startGameAsHost();
+            });
+            
+            // Start local rendering loop immediately for background
+            animate();
+        }
+
+        async function setupClientSession() {
+            if (!userId) return;
+            sessionRef = doc(db, 'artifacts', appId, 'public', 'data', 'kitchenSessions', sessionId);
+            
+            // Mark as joined
+            await setDoc(sessionRef, { clientJoined: true }, { merge: true });
+
+            // Listen to Host's authoritative game state
+            onSnapshot(sessionRef, (docSnap) => {
+                if (!docSnap.exists()) return;
+                const data = docSnap.data();
+                
+                if (data.gameState) {
+                    const prevPhase = gameState.phase;
+                    gameState = data.gameState; // Overwrite local state with Host state
+                    
+                    if (prevPhase === 0 && gameState.phase > 0) {
+                        // Game started by host
+                        showControlsScreen();
+                    } else if (prevPhase !== gameState.phase && gameState.phase > 0) {
+                        showPhaseAnnouncement(gameState.phase);
+                    } else if (gameState.phase === 4 && prevPhase !== 4) {
+                        showResultsScreen();
+                    }
+                }
+            }, (error) => console.error("Client Snapshot error:", error));
+
+            // Start client loop for input sending and rendering
+            animate();
+        }
+
+        // Send Host State to Cloud
+        async function syncHostStateToCloud() {
+            if (!isHost || !userId || !sessionRef) return;
+            
+            const now = Date.now();
+            if (now - lastSyncTime >= SYNC_RATE_MS) {
+                lastSyncTime = now;
+                try {
+                    await setDoc(sessionRef, { gameState: gameState }, { merge: true });
+                } catch(e) { console.error("Sync error:", e); }
+            }
+        }
+
+        // Send Client Input to Cloud
+        let lastClientInputStr = "";
+        async function syncClientInputToCloud() {
+            if (isHost || !userId || !sessionRef) return;
+            
+            // Map client's actual keyboard to logical P2 inputs
+            const currentInput = {
+                left: keys["arrowleft"] || false,
+                right: keys["arrowright"] || false,
+                up: keys["arrowup"] || false
+            };
+            
+            const inputStr = JSON.stringify(currentInput);
+            if (inputStr !== lastClientInputStr) {
+                lastClientInputStr = inputStr;
+                try {
+                    await setDoc(sessionRef, { p2Input: currentInput }, { merge: true });
+                } catch(e) { console.error("Input sync error:", e); }
+            }
+        }
+
+        function startGameAsHost() {
+            lobbyScreen.classList.add('hidden');
+            showControlsScreen();
+            
+            setTimeout(() => {
+                gameState.phase = 1;
+                gameState.timer = 20;
+                syncHostStateToCloud();
+                showPhaseAnnouncement(1);
+            }, 3000); // Wait on controls screen
+        }
+
+        function showControlsScreen() {
+            lobbyScreen.classList.add('hidden');
+            setupScreen.classList.remove('hidden');
+            
+            const controlsDiv = document.getElementById('controls-display');
+            if (isHost) {
+                controlsDiv.innerHTML = `
+                    <div class="bg-[#3e3230] p-6 rounded-xl text-center border-2 border-[#ff8a98]">
+                        <div class="text-4xl mb-2">🦊</div>
+                        <h3 class="text-xl font-bold text-[#ff8a98]">Player 1 (You)</h3>
+                        <p class="text-sm mt-2">Use <kbd class="bg-gray-700 px-2 rounded">A</kbd> <kbd class="bg-gray-700 px-2 rounded">D</kbd> to move</p>
+                        <p class="text-sm">Use <kbd class="bg-gray-700 px-2 rounded">W</kbd> to action</p>
+                    </div>`;
+            } else {
+                controlsDiv.innerHTML = `
+                    <div class="bg-[#3e3230] p-6 rounded-xl text-center border-2 border-[#4db6ac]">
+                        <div class="text-4xl mb-2">🐰</div>
+                        <h3 class="text-xl font-bold text-[#4db6ac]">Player 2 (You)</h3>
+                        <p class="text-sm mt-2">Use <kbd class="bg-gray-700 px-2 rounded">←</kbd> <kbd class="bg-gray-700 px-2 rounded">→</kbd> to move</p>
+                        <p class="text-sm">Use <kbd class="bg-gray-700 px-2 rounded">↑</kbd> to action</p>
+                    </div>`;
+            }
+
+            setTimeout(() => {
+                setupScreen.classList.add('hidden');
+            }, 3000);
+        }
+
+        function showPhaseAnnouncement(phaseNum) {
+            const phaseAnnouncer = document.getElementById('phase-announcer');
+            const phaseTitle = document.getElementById('phase-title');
+            
+            let titleText = "";
+            if (phaseNum === 1) titleText = "Phase 1:<br>Catch Ingredients!";
+            if (phaseNum === 2) titleText = "Phase 2:<br>Sync Whipping!";
+            if (phaseNum === 3) titleText = "Phase 3:<br>Balance the Oven!";
+
+            phaseTitle.innerHTML = titleText;
+            phaseAnnouncer.classList.remove('hidden');
+            phaseAnnouncer.classList.remove('phase-transition');
+            
+            void phaseAnnouncer.offsetWidth; // trigger reflow
+            phaseAnnouncer.classList.add('phase-transition');
+
+            setTimeout(() => {
+                phaseAnnouncer.classList.add('hidden');
+            }, 2000);
+        }
+
+        function createParticles(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= dt * 2;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.globalAlpha = Math.max(0, p.life);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        function roundRect(ctx, x, y, width, height, radius) {
             ctx.beginPath();
-            ctx.moveTo(pointerX, h*0.35);
-            ctx.lineTo(pointerX - 10, h*0.3);
-            ctx.lineTo(pointerX + 10, h*0.3);
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
             ctx.fill();
         }
-    }
 
-    // Finish & Results
-    function finishGame() {
-        cancelAnimationFrame(animationFrameId);
-        if (playMode === "online" && isHost && activeConnection) {
-            activeConnection.send({ type: "GAME_OVER", stats: stats });
+        function runHostLogic(dt) {
+            if (gameState.phase === 1) {
+                // PHASE 1: GATHERING
+                gameState.timer -= dt;
+                if (gameState.timer <= 0) {
+                    gameState.phase = 2;
+                    gameState.items = [];
+                    return;
+                }
+
+                const speed = 400;
+                // Host P1 Input
+                if (keys["a"]) gameState.p1.x -= speed * dt;
+                if (keys["d"]) gameState.p1.x += speed * dt;
+                // Remote P2 Input
+                if (p2RemoteInput.left) gameState.p2.x -= speed * dt;
+                if (p2RemoteInput.right) gameState.p2.x += speed * dt;
+
+                gameState.p1.x = Math.max(35, Math.min(W - 35, gameState.p1.x));
+                gameState.p2.x = Math.max(35, Math.min(W - 35, gameState.p2.x));
+
+                // Spawn items
+                if (Math.random() < 0.03 + (20 - gameState.timer) * 0.002) {
+                    gameState.items.push({
+                        x: Math.random() * (W - 40) + 20,
+                        y: -30,
+                        emoji: itemsList[Math.floor(Math.random() * itemsList.length)],
+                        speed: 150 + Math.random() * 150
+                    });
+                }
+
+                // Update items
+                for (let i = gameState.items.length - 1; i >= 0; i--) {
+                    let item = gameState.items[i];
+                    item.y += item.speed * dt;
+
+                    const hitP1 = Math.abs(item.x - gameState.p1.x) < 40 && Math.abs(item.y - (H-50)) < 30;
+                    const hitP2 = Math.abs(item.x - gameState.p2.x) < 40 && Math.abs(item.y - (H-50)) < 30;
+
+                    if (hitP1 || hitP2) {
+                        gameState.stats.gatheringScore++;
+                        if (hitP1) { gameState.p1.score++; createParticles(item.x, item.y, "#ff8a98"); }
+                        if (hitP2) { gameState.p2.score++; createParticles(item.x, item.y, "#4db6ac"); }
+                        gameState.items.splice(i, 1);
+                    } else if (item.y > H + 30) {
+                        gameState.stats.gatheringMisses++;
+                        gameState.items.splice(i, 1);
+                    }
+                }
+
+            } else if (gameState.phase === 2) {
+                // PHASE 2: WHIPPING
+                gameState.whipScale += 0.8 * whipDirection * dt;
+                if (gameState.whipScale > 1.8) { gameState.whipScale = 1.8; whipDirection = -1; }
+                if (gameState.whipScale < 0.5) { gameState.whipScale = 0.5; whipDirection = 1; }
+
+                if (feedbackAlpha > 0) feedbackAlpha -= dt * 1.5;
+
+                let p1Action = keys["w"] && !gameState.p1.wPressed;
+                let p2Action = p2RemoteInput.up && !gameState.p2.upPressed;
+                
+                gameState.p1.wPressed = keys["w"];
+                gameState.p2.upPressed = p2RemoteInput.up;
+
+                // Sync window detection
+                if ((p1Action && p2RemoteInput.up) || (p2Action && keys["w"])) {
+                    gameState.stats.whippingAttempts++;
+                    gameState.phase2Hits++;
+                    
+                    let accuracy = Math.abs(1.0 - gameState.whipScale);
+                    
+                    if (accuracy < 0.2) {
+                        gameState.stats.whippingPerfectSyncs++;
+                        gameState.whipFeedback = "PERFECT! ✨";
+                        createParticles(W/2, H/2, "#81c784", 20);
+                    } else if (accuracy < 0.5) {
+                        gameState.whipFeedback = "GOOD! 👍";
+                        createParticles(W/2, H/2, "#fff176", 10);
+                    } else {
+                        gameState.whipFeedback = "MISS! 💥";
+                        createParticles(W/2, H/2, "#e57373", 10);
+                    }
+                    
+                    feedbackAlpha = 1.0;
+                    gameState.whipScale = Math.random() < 0.5 ? 0.6 : 1.7; 
+
+                    if (gameState.phase2Hits >= 10) {
+                        gameState.phase = 3;
+                    }
+                }
+
+            } else if (gameState.phase === 3) {
+                // PHASE 3: BAKING
+                gameState.ovenTemp -= 0.5 * dt * 15; // Natural cool
+                if (gameState.ovenTemp < 0) gameState.ovenTemp = 0;
+
+                // P1 Heats
+                if (p1HeatCooldown > 0) p1HeatCooldown -= dt;
+                if ((keys["w"] || keys["a"] || keys["d"]) && p1HeatCooldown <= 0) {
+                    gameState.ovenTemp += 15;
+                    p1HeatCooldown = 0.5;
+                    createParticles(W/2 - 150, H - 55, "#ff5722", 5);
+                }
+
+                // P2 Cools
+                if (p2CoolCooldown > 0) p2CoolCooldown -= dt;
+                if ((p2RemoteInput.up || p2RemoteInput.left || p2RemoteInput.right) && p2CoolCooldown <= 0) {
+                    gameState.ovenTemp -= 15;
+                    p2CoolCooldown = 0.5;
+                    createParticles(W/2 + 150, H - 55, "#4fc3f7", 5);
+                }
+
+                gameState.ovenTemp = Math.max(0, Math.min(100, gameState.ovenTemp));
+
+                if (gameState.ovenTemp >= 40 && gameState.ovenTemp <= 60) {
+                    gameState.balanceTimeSec += dt;
+                    gameState.stats.balancePerfectSecs += dt;
+                }
+                gameState.stats.balanceTotalSecs += dt;
+
+                if (gameState.balanceTimeSec >= 15) {
+                    gameState.phase = 4;
+                    setTimeout(showResultsScreen, 1000); // small delay before showing results
+                }
+            }
         }
-        showResults();
-    }
 
-    function showResults() {
-        document.getElementById("game-screen").classList.add("hidden");
-        document.getElementById("results-screen").classList.remove("hidden");
+        function drawPhase1() {
+            let grad = ctx.createLinearGradient(0, 0, 0, H);
+            grad.addColorStop(0, "#3e2723");
+            grad.addColorStop(1, "#1a1211");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
 
-        // Calculate Scores
-        let gatheringPct = stats.gatheringScore === 0 ? 0 : Math.round((stats.gatheringScore / (stats.gatheringScore + stats.gatheringMisses)) * 100);
-        let syncPct = stats.whippingAttempts === 0 ? 0 : Math.min(100, Math.round((stats.whippingPerfectSyncs / (stats.whippingAttempts/2)) * 100));
-        let balancePct = stats.balanceTotalSecs === 0 ? 0 : Math.round((stats.balancePerfectSecs / stats.balanceTotalSecs) * 100);
+            ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.font = "bold 120px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(Math.ceil(gameState.timer), W/2, H/2 + 40);
 
-        let overall = Math.round((gatheringPct + syncPct + balancePct) / 3);
+            ctx.font = "30px sans-serif";
+            gameState.items.forEach(item => {
+                ctx.fillText(item.emoji, item.x, item.y);
+            });
 
-        document.getElementById("score-percentage").innerText = `${overall}%`;
-        
-        document.getElementById("stat-gathering").innerText = `${gatheringPct}%`;
-        document.getElementById("bar-gathering").style.width = `${gatheringPct}%`;
-        
-        document.getElementById("stat-sync").innerText = `${syncPct}%`;
-        document.getElementById("bar-sync").style.width = `${syncPct}%`;
-        
-        document.getElementById("stat-balance").innerText = `${balancePct}%`;
-        document.getElementById("bar-balance").style.width = `${balancePct}%`;
+            drawBowl(gameState.p1.x, H - 50, "#ff8a98", AVATARS[0], gameState.p1.score);
+            drawBowl(gameState.p2.x, H - 50, "#4db6ac", AVATARS[1], gameState.p2.score);
+        }
 
-        let archTitle = "Chaotic Kitchen Duo";
-        if (overall > 85) archTitle = "Perfect Rhythm Partners";
-        else if (overall > 65) archTitle = "Balanced Bakers";
-        else if (overall > 40) archTitle = "The Messy Masterminds";
-        
-        document.getElementById("archetype-title").innerText = archTitle;
-    }
+        function drawBowl(x, y, color, avatar, score) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, 35, 0, Math.PI, false);
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "24px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(avatar, x, y - 10);
+            
+            ctx.font = "bold 14px sans-serif";
+            ctx.fillText(score, x, y + 25);
+            
+            // Draw highlight if it's the local player
+            if ((color === "#ff8a98" && isHost) || (color === "#4db6ac" && !isHost)) {
+                ctx.strokeStyle = "rgba(255,255,255,0.5)";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(x, y, 40, 0, Math.PI, false);
+                ctx.stroke();
+            }
+        }
 
-    function resetSetup() {
-        location.reload();
-    }
+        function drawPhase2() {
+            ctx.fillStyle = "#2d2321";
+            ctx.fillRect(0, 0, W, H);
 
-    function shareResults() {
-        let text = `🧁 Cozy Kitchen Results 🧁\nOur Compatibility: ${document.getElementById("score-percentage").innerText}\nArchetype: ${document.getElementById("archetype-title").innerText}\nCan you beat us?`;
-        navigator.clipboard.writeText(text);
-        alert("Results copied to clipboard!");
-    }
+            const cx = W/2;
+            const cy = H/2;
 
-</script>
+            // Target Ring (Green zone)
+            ctx.beginPath();
+            ctx.arc(cx, cy, 100, 0, Math.PI*2);
+            ctx.strokeStyle = "rgba(129, 199, 132, 0.5)";
+            ctx.lineWidth = 15;
+            ctx.stroke();
+
+            // Expanding/Contracting Ring
+            ctx.beginPath();
+            ctx.arc(cx, cy, 100 * gameState.whipScale, 0, Math.PI*2);
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 5;
+            ctx.stroke();
+
+            ctx.fillStyle = "#4a322c";
+            ctx.beginPath();
+            ctx.arc(cx, cy, 80, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.font = "50px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("🥣", cx, cy + 20);
+
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 20px 'Quicksand'";
+            ctx.fillText(`Whip together when rings align! (${gameState.phase2Hits}/10)`, cx, 50);
+            
+            ctx.fillStyle = "#ff8a98";
+            ctx.fillText(`P1 (Host): Tap W`, cx - 180, H - 50);
+            ctx.fillStyle = "#4db6ac";
+            ctx.fillText(`P2 (Guest): Tap UP`, cx + 180, H - 50);
+
+            // Local player highlight text
+            if (isHost) {
+                ctx.fillStyle = "rgba(255, 138, 152, 0.3)";
+                roundRect(ctx, cx - 280, H - 80, 200, 40, 10);
+            } else {
+                ctx.fillStyle = "rgba(77, 182, 172, 0.3)";
+                roundRect(ctx, cx + 80, H - 80, 200, 40, 10);
+            }
+
+            if (gameState.whipFeedback && isHost) feedbackAlpha = 1.0; // Quick reset for host
+            if (gameState.whipFeedback && feedbackAlpha === 0 && !isHost) feedbackAlpha = 1.0; // Client visual sync
+
+            if (feedbackAlpha > 0) {
+                ctx.globalAlpha = feedbackAlpha;
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 40px 'Quicksand'";
+                ctx.fillText(gameState.whipFeedback, cx, cy - 150);
+                ctx.globalAlpha = 1.0;
+                if(!isHost) feedbackAlpha -= 0.03; // Client local fade
+            }
+        }
+
+        function drawPhase3() {
+            let grad = ctx.createLinearGradient(0, 0, 0, H);
+            grad.addColorStop(0, "#2d2321");
+            grad.addColorStop(1, "#1a1211");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+
+            const cx = W / 2;
+            const cy = H / 2 - 20;
+
+            ctx.fillStyle = "#4a322c";
+            roundRect(ctx, cx - 120, cy - 60, 240, 140, 15);
+            
+            const glowOpacity = Math.min(1, (gameState.ovenTemp / 100) * 1.2);
+            ctx.fillStyle = `rgba(255, 110, 40, ${glowOpacity})`;
+            roundRect(ctx, cx - 110, cy - 50, 220, 120, 10);
+            
+            ctx.font = "60px sans-serif";
+            ctx.textAlign = "center";
+            let cakeState = "🎂";
+            if (gameState.ovenTemp > 80) cakeState = "🔥";
+            if (gameState.ovenTemp < 20) cakeState = "🧊";
+            ctx.fillText(cakeState, cx, cy + 20);
+
+            const barX = cx - 200;
+            const barY = H - 80;
+            const barW = 400;
+            const barH = 24;
+
+            ctx.fillStyle = "#1e1615";
+            roundRect(ctx, barX, barY, barW, barH, 12);
+
+            ctx.fillStyle = "rgba(76, 175, 80, 0.4)";
+            roundRect(ctx, barX + (barW * 0.40), barY - 4, barW * 0.20, barH + 8, 4);
+
+            const indX = barX + (barW * (gameState.ovenTemp / 100));
+            ctx.fillStyle = "#ff5722";
+            if (gameState.ovenTemp < 40) ctx.fillStyle = "#4fc3f7"; 
+            if (gameState.ovenTemp >= 40 && gameState.ovenTemp <= 60) ctx.fillStyle = "#81c784"; 
+            
+            ctx.beginPath();
+            ctx.arc(indX, barY + barH/2, 16, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            ctx.font = "bold 14px sans-serif";
+            ctx.fillStyle = "#4fc3f7";
+            ctx.fillText("TOO COLD", barX - 45, barY + 16);
+            ctx.fillStyle = "#ff5722";
+            ctx.fillText("BURNING!", barX + barW + 45, barY + 16);
+
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 20px 'Quicksand'";
+            ctx.fillText(`Keep balanced: ${Math.floor(gameState.balanceTimeSec)}s / 15s`, cx, 50);
+
+            ctx.font = "40px sans-serif";
+            ctx.fillText(AVATARS[0], cx - 180, cy + 10);
+            ctx.fillText(AVATARS[1], cx + 180, cy + 10);
+
+            ctx.font = "bold 14px 'Quicksand'";
+            ctx.fillStyle = "#ff8a98";
+            ctx.fillText(isHost ? `P1 STOKE (Tap W) [YOU]` : `P1 STOKE (Host)`, cx - 180, cy + 50);
+            ctx.fillStyle = "#4db6ac";
+            ctx.fillText(!isHost ? `P2 VENT (Tap UP) [YOU]` : `P2 VENT (Guest)`, cx + 180, cy + 50);
+
+            ctx.font = "bold 18px 'Quicksand'";
+            if (gameState.ovenTemp < 40) {
+                ctx.fillStyle = "#ffb74d";
+                ctx.fillText("⚠️ Too cold! P1, heat it up!", cx, cy - 80);
+            } else if (gameState.ovenTemp > 60) {
+                ctx.fillStyle = "#e57373";
+                ctx.fillText("⚠️ Burning! P2, vent cool air!", cx, cy - 80);
+            } else {
+                ctx.fillStyle = "#81c784";
+                ctx.fillText("✨ Perfect sweet spot! ✨", cx, cy - 80);
+            }
+        }
+
+        function showResultsScreen() {
+            if (!document.getElementById('results-screen').classList.contains('hidden')) return;
+            
+            document.getElementById('results-screen').classList.remove('hidden');
+            
+            const stats = gameState.stats;
+            const gatheringTotal = stats.gatheringScore + stats.gatheringMisses;
+            const gatheringRatio = gatheringTotal > 0 ? (stats.gatheringScore / gatheringTotal) * 100 : 0;
+            const whipRatio = stats.whippingAttempts > 0 ? (stats.whippingPerfectSyncs / stats.whippingAttempts) * 100 : 0;
+            const balanceRatio = stats.balanceTotalSecs > 0 ? (stats.balancePerfectSecs / stats.balanceTotalSecs) * 100 : 0;
+            
+            const synergy = Math.round((gatheringRatio + whipRatio + balanceRatio) / 3);
+
+            document.getElementById('score-percentage').innerText = `${synergy}%`;
+            document.getElementById('stat-gathering').innerText = `${Math.round(gatheringRatio)}%`;
+            setTimeout(() => document.getElementById('bar-gathering').style.width = `${gatheringRatio}%`, 100);
+            document.getElementById('stat-sync').innerText = `${Math.round(whipRatio)}%`;
+            setTimeout(() => document.getElementById('bar-sync').style.width = `${whipRatio}%`, 300);
+            document.getElementById('stat-balance').innerText = `${Math.round(balanceRatio)}%`;
+            setTimeout(() => document.getElementById('bar-balance').style.width = `${balanceRatio}%`, 500);
+
+            let archTitle = "";
+            let archDesc = "";
+
+            if (synergy >= 85) {
+                archTitle = "🏆 Soulmate Pastry Prodigies";
+                archDesc = "Seamless mental lockstep over the network! Your ability to catch together, and balance under pressure without collision is legendary.";
+                document.getElementById('score-percentage').className = "text-5xl font-bold text-green-400 mt-1";
+            } else if (synergy >= 60) {
+                archTitle = "💞 Harmonious Kitchen Co-Creators";
+                archDesc = "You work together beautifully. While a few spills happened, your dynamic rhythm and balancing instincts kept the recipe stable.";
+                document.getElementById('score-percentage').className = "text-5xl font-bold text-yellow-400 mt-1";
+            } else {
+                archTitle = "🔥 Passionate Fire & Ice Bakers";
+                archDesc = "High individual drive causes coordination chaos! Learning to yield turns and match rhythms will take your sync to a new peak.";
+                document.getElementById('score-percentage').className = "text-5xl font-bold text-red-400 mt-1";
+            }
+
+            document.getElementById('archetype-title').innerText = archTitle;
+            document.getElementById('archetype-desc').innerText = archDesc;
+        }
+
+        function animate() {
+            const now = Date.now();
+            const dt = Math.min((now - lastLocalUpdate) / 1000, 0.1);
+            lastLocalUpdate = now;
+
+            if (gameState.phase > 0 && gameState.phase < 4) {
+                
+                // HOST: Run Physics & Sync to DB
+                if (isHost) {
+                    runHostLogic(dt);
+                    syncHostStateToCloud();
+                } else {
+                    // CLIENT: Sync input to DB
+                    syncClientInputToCloud();
+                }
+
+                // BOTH: Render based on unified `gameState` object
+                ctx.clearRect(0, 0, W, H);
+                if (gameState.phase === 1) drawPhase1();
+                if (gameState.phase === 2) drawPhase2();
+                if (gameState.phase === 3) drawPhase3();
+
+                // Particles are handled client-side for smoothness, triggered by physics events
+                updateParticles(dt);
+                drawParticles();
+            } else if (gameState.phase === 0) {
+                // Background render for lobby
+                ctx.fillStyle = "#2d2321";
+                ctx.fillRect(0, 0, W, H);
+                
+                ctx.font = "80px sans-serif";
+                ctx.fillStyle = "rgba(255,255,255,0.05)";
+                ctx.textAlign = "center";
+                ctx.fillText("🥐 🥨 🥖", W/2, H/2 + 20);
+            }
+
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // Initialize Firebase when page loads
+        window.addEventListener('load', initMultiplayer);
+
+    </script>
 </body>
 </html>
