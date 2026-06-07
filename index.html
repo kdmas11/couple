@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cozy Kitchen Baking Challenge - Multiplayer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
@@ -18,6 +18,7 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            touch-action: none; /* Prevents mobile pull-to-refresh */
         }
 
         #game-container {
@@ -116,17 +117,38 @@
             user-select: all;
             cursor: pointer;
         }
+
+        /* Virtual Joystick Buttons */
+        .touch-btn {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
     </style>
 </head>
 <body>
 
-    <div id="game-container" style="width: 800px; height: 600px;">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <!-- Responsive Container scaling aspect ratio for both mobile and desktop -->
+    <div id="game-container" class="w-full max-w-[800px] aspect-[4/3] mx-auto">
+        <canvas id="gameCanvas" width="800" height="600" class="w-full h-full block object-cover"></canvas>
+
+        <!-- On-Screen Virtual Touch Controls -->
+        <div id="touch-controls" class="absolute bottom-6 left-0 w-full flex justify-between px-8 hidden z-20 pointer-events-none">
+            <!-- Movement Block -->
+            <div class="flex gap-4 pointer-events-auto">
+                <button id="btn-left" class="touch-btn w-16 h-16 md:w-20 md:h-20 bg-white/20 active:bg-white/40 backdrop-blur border-2 border-white/50 rounded-full text-2xl md:text-4xl select-none flex items-center justify-center text-white">◀</button>
+                <button id="btn-right" class="touch-btn w-16 h-16 md:w-20 md:h-20 bg-white/20 active:bg-white/40 backdrop-blur border-2 border-white/50 rounded-full text-2xl md:text-4xl select-none flex items-center justify-center text-white">▶</button>
+            </div>
+            <!-- Action Block -->
+            <div class="pointer-events-auto">
+                <button id="btn-action" class="touch-btn w-16 h-16 md:w-20 md:h-20 bg-orange-500/50 active:bg-orange-500/80 backdrop-blur border-2 border-orange-200/50 rounded-full text-2xl md:text-4xl select-none flex items-center justify-center text-white">🔥</button>
+            </div>
+        </div>
 
         <!-- Multiplayer Lobby Screen -->
-        <div id="lobby-screen" class="ui-overlay">
-            <h1 class="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">Cozy Kitchen</h1>
-            <h2 class="text-2xl mb-8">Multiplayer Co-op</h2>
+        <div id="lobby-screen" class="ui-overlay p-4 text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">Cozy Kitchen</h1>
+            <h2 class="text-xl md:text-2xl mb-8">Multiplayer Co-op</h2>
             
             <!-- Mode Selection Section -->
             <div id="mode-selection-section" class="flex flex-col items-center gap-4 mb-6">
@@ -135,30 +157,30 @@
             </div>
 
             <!-- Name Entry Section -->
-            <div id="name-entry-section" class="flex flex-col items-center mb-6 hidden">
+            <div id="name-entry-section" class="flex flex-col items-center mb-6 hidden w-full max-w-sm">
                 <h3 id="name-entry-title" class="text-xl mb-4 font-bold text-gray-300"></h3>
-                <input type="text" id="manual-session-id" placeholder="Paste Invite Link or Room ID..." class="px-6 py-3 rounded-full text-black font-bold outline-none mb-4 text-center w-80 text-sm border-4 border-transparent focus:border-[#4db6ac] transition-colors hidden">
-                <input type="text" id="player-name" placeholder="Enter your name..." class="px-6 py-3 rounded-full text-black font-bold outline-none mb-4 text-center w-64 text-lg border-4 border-transparent focus:border-[#ff8a98] transition-colors">
-                <button id="action-btn" class="btn-primary w-64"></button>
+                <input type="text" id="manual-session-id" placeholder="Paste Invite Link..." class="px-6 py-3 rounded-full text-black font-bold outline-none mb-4 text-center w-full text-sm border-4 border-transparent focus:border-[#4db6ac] transition-colors hidden">
+                <input type="text" id="player-name" placeholder="Enter your name..." class="px-6 py-3 rounded-full text-black font-bold outline-none mb-4 text-center w-full text-lg border-4 border-transparent focus:border-[#ff8a98] transition-colors">
+                <button id="action-btn" class="btn-primary w-full"></button>
                 <button id="back-btn" class="mt-4 text-sm text-gray-400 hover:text-white underline">Back</button>
             </div>
 
-            <div id="loading-auth" class="text-xl text-yellow-400 mb-4 animate-pulse hidden">Connecting to P2P network...</div>
+            <div id="loading-auth" class="text-xl text-yellow-400 mb-4 animate-pulse hidden">Connecting to network...</div>
 
-            <div id="host-controls" class="hidden flex flex-col items-center">
+            <div id="host-controls" class="hidden flex flex-col items-center w-full max-w-sm">
                 <p class="mb-4 text-lg text-gray-300">You are <span id="host-name-display" class="font-bold text-[#ff8a98]"></span> 🦊</p>
-                <div class="bg-[#3e3230] p-4 rounded-lg mb-6 w-96 text-center border border-gray-600">
-                    <p class="text-sm text-gray-400 mb-2">Send this link to your partner:</p>
-                    <input type="text" id="invite-link" readonly class="w-full bg-[#1e1615] text-white p-2 rounded text-center text-sm border border-gray-700 outline-none" value="Generating...">
+                <div class="bg-[#3e3230] p-4 rounded-lg mb-6 w-full text-center border border-gray-600">
+                    <p class="text-xs text-gray-400 mb-2">Send this link to your partner:</p>
+                    <input type="text" id="invite-link" readonly class="w-full bg-[#1e1615] text-white p-2 rounded text-center text-xs border border-gray-700 outline-none" value="Generating...">
                     <button id="copy-btn" class="mt-3 text-sm bg-gray-700 hover:bg-gray-600 px-4 py-1 rounded transition-colors">Copy Link</button>
                 </div>
-                <div id="host-status" class="text-yellow-400 mb-6 font-bold animate-pulse">Waiting for your partner to join...</div>
+                <div id="host-status" class="text-yellow-400 mb-6 font-bold animate-pulse text-sm">Waiting for partner...</div>
                 <button id="start-btn" class="btn-primary hidden">Ready</button>
             </div>
 
             <div id="client-controls" class="hidden flex flex-col items-center">
                 <p class="mb-4 text-lg text-gray-300">You are <span id="client-name-display" class="font-bold text-[#4db6ac]"></span> 🐰</p>
-                <div id="client-status" class="text-green-400 mb-6 font-bold">Connecting to Host...</div>
+                <div id="client-status" class="text-green-400 mb-6 font-bold text-center">Connecting to Host...</div>
                 <button id="client-ready-btn" class="btn-primary hidden">Ready</button>
             </div>
         </div>
@@ -167,44 +189,44 @@
         <div id="setup-screen" class="ui-overlay hidden">
             <h2 class="text-3xl font-bold mb-8">Your Controls</h2>
             
-            <div class="flex gap-8 mb-8" id="controls-display">
+            <div class="flex flex-col md:flex-row gap-4 md:gap-8 mb-8" id="controls-display">
                 <!-- Injected via JS based on role -->
             </div>
 
-            <p class="text-yellow-400 mt-4 animate-pulse">Game starting in a moment...</p>
+            <p class="text-yellow-400 mt-4 animate-pulse text-center">Game starting in a moment...</p>
         </div>
 
         <!-- Phase Transition Announcement -->
         <div id="phase-announcer" class="ui-overlay hidden bg-transparent pointer-events-none">
-            <h1 id="phase-title" class="text-6xl font-bold text-center text-white drop-shadow-lg"></h1>
+            <h1 id="phase-title" class="text-4xl md:text-6xl font-bold text-center text-white drop-shadow-lg"></h1>
         </div>
 
         <!-- Results Screen -->
-        <div id="results-screen" class="ui-overlay hidden p-8 overflow-y-auto">
-            <h1 class="text-4xl font-bold mb-2 text-yellow-400">Baking Complete!</h1>
-            <h2 id="archetype-title" class="text-2xl font-bold mb-4"></h2>
-            <p id="archetype-desc" class="text-center max-w-lg mb-6 text-gray-300"></p>
+        <div id="results-screen" class="ui-overlay hidden p-4 md:p-8 overflow-y-auto text-center">
+            <h1 class="text-3xl md:text-4xl font-bold mb-2 text-yellow-400 mt-10">Baking Complete!</h1>
+            <h2 id="archetype-title" class="text-xl md:text-2xl font-bold mb-4"></h2>
+            <p id="archetype-desc" class="text-center max-w-lg mb-6 text-gray-300 text-sm md:text-base"></p>
             
-            <div class="w-full max-w-md bg-[#3e3230] p-6 rounded-xl shadow-lg">
+            <div class="w-full max-w-md bg-[#3e3230] p-6 rounded-xl shadow-lg mx-auto">
                 <div class="text-center mb-4">
                     <span class="text-gray-400 uppercase tracking-wide text-sm">Overall Synergy</span>
                     <div id="score-percentage" class="text-5xl font-bold text-white mt-1">0%</div>
                 </div>
                 
                 <div class="text-left mt-6">
-                    <div class="flex justify-between text-sm mb-1">
+                    <div class="flex justify-between text-xs md:text-sm mb-1">
                         <span>Phase 1: Gathering Sync</span>
                         <span id="stat-gathering" class="font-bold">0%</span>
                     </div>
                     <div class="stat-bar-container"><div id="bar-gathering" class="stat-bar bg-green-400" style="width: 0%;"></div></div>
 
-                    <div class="flex justify-between text-sm mb-1 mt-4">
+                    <div class="flex justify-between text-xs md:text-sm mb-1 mt-4">
                         <span>Phase 2: Whipping Sync</span>
                         <span id="stat-sync" class="font-bold">0%</span>
                     </div>
                     <div class="stat-bar-container"><div id="bar-sync" class="stat-bar bg-blue-400" style="width: 0%;"></div></div>
 
-                    <div class="flex justify-between text-sm mb-1 mt-4">
+                    <div class="flex justify-between text-xs md:text-sm mb-1 mt-4">
                         <span>Phase 3: Oven Balance</span>
                         <span id="stat-balance" class="font-bold">0%</span>
                     </div>
@@ -212,7 +234,7 @@
                 </div>
             </div>
             
-            <p class="mt-8 text-gray-400">Refresh the page to start a new session.</p>
+            <p class="mt-8 text-gray-400 text-sm">Refresh the page to start a new session.</p>
         </div>
     </div>
 
@@ -238,6 +260,28 @@
         window.addEventListener("keydown", (e) => keys[e.key.toLowerCase()] = true);
         window.addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
 
+        // Virtual Touch Controls Binder
+        function bindVirtualKey(btnId, hostKey, guestKey) {
+            const btn = document.getElementById(btnId);
+            const press = (e) => {
+                e.preventDefault();
+                keys[isHost ? hostKey : guestKey] = true;
+            };
+            const release = (e) => {
+                e.preventDefault();
+                keys[isHost ? hostKey : guestKey] = false;
+            };
+            btn.addEventListener('mousedown', press);
+            btn.addEventListener('touchstart', press, {passive: false});
+            btn.addEventListener('mouseup', release);
+            btn.addEventListener('mouseleave', release);
+            btn.addEventListener('touchend', release);
+        }
+
+        bindVirtualKey('btn-left', 'a', 'arrowleft');
+        bindVirtualKey('btn-right', 'd', 'arrowright');
+        bindVirtualKey('btn-action', 'w', 'arrowup');
+
         // UI Elements
         const lobbyScreen = document.getElementById('lobby-screen');
         const modeSelectionSection = document.getElementById('mode-selection-section');
@@ -257,6 +301,7 @@
         const startBtn = document.getElementById('start-btn');
         const clientReadyBtn = document.getElementById('client-ready-btn');
         const setupScreen = document.getElementById('setup-screen');
+        const touchControls = document.getElementById('touch-controls');
 
         const urlParams = new URLSearchParams(window.location.search);
         let joinSessionId = urlParams.get('session');
@@ -270,7 +315,7 @@
             p2Name: "Player 2",
             p1: { x: W * 0.25, score: 0, wPressed: false },
             p2: { x: W * 0.75, score: 0, upPressed: false },
-            items: [], // {x, y, emoji, speed}
+            items: [], 
             whipScale: 1.0,
             whipFeedback: "",
             phase2Hits: 0,
@@ -295,13 +340,11 @@
 
         // --- PRE-MULTIPLAYER SETUP ---
         if (joinSessionId) {
-            // Arrived via direct link
             modeSelectionSection.classList.add('hidden');
             nameEntrySection.classList.remove('hidden');
             isHostingFlow = false;
             setupNameEntryUI();
         } else {
-            // Default to Mode Selection
             modeSelectionSection.classList.remove('hidden');
             nameEntrySection.classList.add('hidden');
         }
@@ -352,7 +395,6 @@
                     alert("Please enter a Room ID or Invite Link to join!");
                     return;
                 }
-                // Robust parsing of manual links
                 if (manualInput.includes('session=')) {
                     try {
                         let parsedUrl = new URL(manualInput);
@@ -372,25 +414,34 @@
 
         // --- PEER.JS MULTIPLAYER LOGIC ---
         function initMultiplayer() {
-            peerInstance = new Peer();
+            // Explicitly define Google's free STUN servers to punch through firewalls on different networks
+            const peerConfig = {
+                config: {
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun3.l.google.com:19302' },
+                        { urls: 'stun:stun4.l.google.com:19302' }
+                    ]
+                }
+            };
+
+            peerInstance = new Peer(peerConfig);
 
             if (!isHostingFlow) {
-                // --- WE ARE THE CLIENT (Player 2) ---
+                // WE ARE THE CLIENT
                 isHost = false;
                 loadingAuth.classList.add('hidden');
                 clientControls.classList.remove('hidden');
                 document.getElementById('client-name-display').innerText = myName;
 
                 peerInstance.on('open', () => {
-                    // Connect with reliable true to ensure handshake messages aren't dropped
                     activeConnection = peerInstance.connect(joinSessionId, { reliable: true });
-                    
-                    // Attach data listeners IMMEDIATELY
                     setupClientListeners();
                     
                     activeConnection.on('open', () => {
                         document.getElementById('client-status').innerText = "Synchronizing with Host...";
-                        // We do NOT send our name yet. We wait for the Host to send HOST_ACK to avoid a race condition.
                     });
 
                     activeConnection.on('error', (err) => {
@@ -400,7 +451,7 @@
                 });
                 
             } else {
-                // --- WE ARE THE HOST (Player 1) ---
+                // WE ARE THE HOST
                 isHost = true;
                 gameState.p1Name = myName; 
                 
@@ -422,18 +473,14 @@
                         });
                     });
                     
-                    animate(); // Start rendering background loop
+                    animate(); 
                 });
 
-                // Listen for client joining
                 peerInstance.on('connection', (conn) => {
                     activeConnection = conn;
-                    
-                    // Attach data listeners IMMEDIATELY
                     setupHostListeners();
                     
                     activeConnection.on('open', () => {
-                        // Crucial Fix: Explicit handshake acknowledging Host is ready to receive
                         activeConnection.send({ type: 'HOST_ACK' });
                     });
                 });
@@ -466,7 +513,6 @@
             if(!activeConnection) return;
             activeConnection.on('data', (payload) => {
                 if (payload.type === 'HOST_ACK') {
-                    // Host has explicitly signaled they are ready to receive data
                     document.getElementById('client-status').innerText = "Connected! Press Ready when you are.";
                     clientReadyBtn.classList.remove('hidden');
                     activeConnection.send({ type: 'SET_NAME', data: myName });
@@ -570,25 +616,25 @@
             const controlsDiv = document.getElementById('controls-display');
             if (isHost) {
                 controlsDiv.innerHTML = `
-                    <div class="bg-[#3e3230] p-6 rounded-xl text-center border-2 border-[#ff8a98]">
+                    <div class="bg-[#3e3230] p-6 rounded-xl text-center border-2 border-[#ff8a98] shadow-lg">
                         <div class="text-4xl mb-2">🦊</div>
                         <h3 class="text-xl font-bold text-[#ff8a98]">${gameState.p1Name} (Host)</h3>
-                        <p class="text-sm mt-2">Use <kbd class="bg-gray-700 px-2 rounded">A</kbd> <kbd class="bg-gray-700 px-2 rounded">D</kbd> to move</p>
-                        <p class="text-sm">Use <kbd class="bg-gray-700 px-2 rounded">W</kbd> to action</p>
+                        <p class="text-sm mt-2">Keyboard: <kbd class="bg-gray-700 px-2 rounded">A</kbd> <kbd class="bg-gray-700 px-2 rounded">D</kbd> or <br> Mobile: On-Screen Joysticks</p>
+                        <p class="text-sm mt-2">Action: <kbd class="bg-gray-700 px-2 rounded">W</kbd> or <br> Mobile: Fire Button</p>
                     </div>`;
             } else {
                 controlsDiv.innerHTML = `
-                    <div class="bg-[#3e3230] p-6 rounded-xl text-center border-2 border-[#4db6ac]">
+                    <div class="bg-[#3e3230] p-6 rounded-xl text-center border-2 border-[#4db6ac] shadow-lg">
                         <div class="text-4xl mb-2">🐰</div>
                         <h3 class="text-xl font-bold text-[#4db6ac]">${gameState.p2Name} (Guest)</h3>
-                        <p class="text-sm mt-2">Use <kbd class="bg-gray-700 px-2 rounded">←</kbd> <kbd class="bg-gray-700 px-2 rounded">→</kbd> to move</p>
-                        <p class="text-sm">Use <kbd class="bg-gray-700 px-2 rounded">↑</kbd> to action</p>
+                        <p class="text-sm mt-2">Keyboard: <kbd class="bg-gray-700 px-2 rounded">←</kbd> <kbd class="bg-gray-700 px-2 rounded">→</kbd> or <br> Mobile: On-Screen Joysticks</p>
+                        <p class="text-sm mt-2">Action: <kbd class="bg-gray-700 px-2 rounded">↑</kbd> or <br> Mobile: Fire Button</p>
                     </div>`;
             }
 
             setTimeout(() => {
                 setupScreen.classList.add('hidden');
-            }, 3000);
+            }, 4000);
         }
 
         function showPhaseAnnouncement(phaseNum) {
@@ -671,7 +717,7 @@
                 }
 
                 const speed = 400;
-                // Host P1 Input
+                // Host P1 Input (Reads mapped virtual buttons too)
                 if (keys["a"]) gameState.p1.x -= speed * dt;
                 if (keys["d"]) gameState.p1.x += speed * dt;
                 // Remote P2 Input
@@ -782,7 +828,7 @@
 
                 if (gameState.balanceTimeSec >= 15) {
                     gameState.phase = 4;
-                    setTimeout(showResultsScreen, 1000); // small delay before showing results
+                    setTimeout(showResultsScreen, 1000); 
                 }
             }
         }
@@ -821,7 +867,6 @@
             ctx.font = "bold 14px sans-serif";
             ctx.fillText(score, x, y + 25);
             
-            // Draw highlight if it's the local player
             if ((color === "#ff8a98" && isHost) || (color === "#4db6ac" && !isHost)) {
                 ctx.strokeStyle = "rgba(255,255,255,0.5)";
                 ctx.lineWidth = 2;
@@ -870,7 +915,6 @@
             ctx.fillStyle = "#4db6ac";
             ctx.fillText(`${gameState.p2Name} (Guest): Tap UP`, cx + 180, H - 50);
 
-            // Local player highlight text
             if (isHost) {
                 ctx.fillStyle = "rgba(255, 138, 152, 0.3)";
                 roundRect(ctx, cx - 280, H - 80, 200, 40, 10);
@@ -879,8 +923,8 @@
                 roundRect(ctx, cx + 80, H - 80, 200, 40, 10);
             }
 
-            if (gameState.whipFeedback && isHost) feedbackAlpha = 1.0; // Quick reset for host
-            if (gameState.whipFeedback && feedbackAlpha === 0 && !isHost) feedbackAlpha = 1.0; // Client visual sync
+            if (gameState.whipFeedback && isHost) feedbackAlpha = 1.0; 
+            if (gameState.whipFeedback && feedbackAlpha === 0 && !isHost) feedbackAlpha = 1.0;
 
             if (feedbackAlpha > 0) {
                 ctx.globalAlpha = feedbackAlpha;
@@ -888,7 +932,7 @@
                 ctx.font = "bold 40px 'Quicksand'";
                 ctx.fillText(gameState.whipFeedback, cx, cy - 150);
                 ctx.globalAlpha = 1.0;
-                if(!isHost) feedbackAlpha -= 0.03; // Client local fade
+                if(!isHost) feedbackAlpha -= 0.03; 
             }
         }
 
@@ -955,9 +999,9 @@
 
             ctx.font = "bold 14px 'Quicksand'";
             ctx.fillStyle = "#ff8a98";
-            ctx.fillText(isHost ? `${gameState.p1Name} STOKE (Tap W) [YOU]` : `${gameState.p1Name} STOKE (Host)`, cx - 180, cy + 50);
+            ctx.fillText(isHost ? `${gameState.p1Name} HEAT [YOU]` : `${gameState.p1Name} HEAT`, cx - 180, cy + 50);
             ctx.fillStyle = "#4db6ac";
-            ctx.fillText(!isHost ? `${gameState.p2Name} VENT (Tap UP) [YOU]` : `${gameState.p2Name} VENT (Guest)`, cx + 180, cy + 50);
+            ctx.fillText(!isHost ? `${gameState.p2Name} COOL [YOU]` : `${gameState.p2Name} COOL`, cx + 180, cy + 50);
 
             ctx.font = "bold 18px 'Quicksand'";
             if (gameState.ovenTemp < 40) {
@@ -973,6 +1017,7 @@
         }
 
         function showResultsScreen() {
+            touchControls.classList.add('hidden'); // Hide mobile controls
             if (!document.getElementById('results-screen').classList.contains('hidden')) return;
             
             document.getElementById('results-screen').classList.remove('hidden');
@@ -1021,6 +1066,8 @@
 
             if (gameState.phase > 0 && gameState.phase < 4) {
                 
+                touchControls.classList.remove('hidden'); // Ensure mobile controls are visible
+
                 // HOST: Run Physics & Sync to Peer
                 if (isHost) {
                     runHostLogic(dt);
