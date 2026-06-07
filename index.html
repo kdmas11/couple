@@ -14,7 +14,6 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    color: #333;
   }
 
   .card {
@@ -25,8 +24,6 @@
     text-align: center;
     box-shadow: 0 10px 25px rgba(0,0,0,.15);
   }
-
-  h2 { margin-top: 0 }
 
   input {
     width: 100%;
@@ -47,8 +44,8 @@
     color: white;
     margin-top: 8px;
     cursor: pointer;
-    transition: transform .1s ease, box-shadow .1s ease;
     box-shadow: 0 6px 0 #e63950;
+    transition: transform .1s ease, box-shadow .1s ease;
   }
 
   button:active {
@@ -73,8 +70,8 @@
   <!-- NAME -->
   <div id="nameScreen">
     <h2>💖 Bake Our Love</h2>
-    <p>What should your partner call you?</p>
-    <input id="nameInput" placeholder="Your name" />
+    <p>Your name?</p>
+    <input id="nameInput" placeholder="Enter your name" />
     <button onclick="saveName()">Continue</button>
   </div>
 
@@ -82,13 +79,13 @@
   <div id="roomScreen" class="hidden">
     <h2>Hello <span id="myName"></span> 👋</h2>
     <button onclick="createRoom()">Create Room</button>
-    <input id="roomInput" placeholder="Enter partner's code" />
+    <input id="roomInput" placeholder="Enter partner code" />
     <button class="soft" onclick="joinRoom()">Join Room</button>
   </div>
 
   <!-- WAIT -->
   <div id="waitScreen" class="hidden">
-    <h2>Waiting for your partner…</h2>
+    <h2>Waiting for partner…</h2>
     <h1 id="roomCode"></h1>
     <p>Share this code ❤️</p>
   </div>
@@ -113,7 +110,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-/* FIREBASE CONFIG (UNCHANGED) */
+/* FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyAlN3n35NJQI2-mdNnVW7oyWSu3RN2YQsw",
   authDomain: "couplegame-ee52e.firebaseapp.com",
@@ -128,40 +125,44 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-let uid, name, roomId, role, step = 0;
+let uid, name, roomId;
+let step = 0;
 
+/* GAME STEPS */
 const bakingSteps = [
   {
     text: "Choose a base 🥣",
     A: "Chocolate",
     B: "Vanilla",
-    match: "Sweet harmony! You enjoy similar comforts ❤️",
-    diff: "Different tastes — great chance to surprise each other 💬"
+    match: "Sweet harmony! ❤️",
+    diff: "Different tastes — talk & blend 💬"
   },
   {
-    text: "How patient are you while baking?",
-    A: "Low heat, slow bake",
-    B: "High heat, quick finish",
-    match: "You move at the same pace — lovely rhythm 💞",
-    diff: "One rushes, one waits — communication makes magic ✨"
+    text: "Baking pace?",
+    A: "Slow & steady",
+    B: "Fast & fun",
+    match: "Same rhythm — beautiful 💞",
+    diff: "Different pace — communicate ✨"
   },
   {
     text: "Final touch?",
-    A: "Simple & clean",
-    B: "Extra decorations",
-    match: "Shared vision — your love shows ❤️",
-    diff: "Different styles — blend them for beauty 🎂"
+    A: "Simple",
+    B: "Decorated",
+    match: "Shared vision 🎂",
+    diff: "Different styles — mix magic ✨"
   }
 ];
 
+/* AUTH */
 signInAnonymously(auth).then(r => uid = r.user.uid);
 
-/* UI helpers */
-const show = id => {
+/* UI helper */
+function show(id) {
   document.querySelectorAll(".card > div").forEach(d => d.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
-};
+}
 
+/* NAME */
 window.saveName = () => {
   name = nameInput.value.trim();
   if (!name) return;
@@ -169,37 +170,52 @@ window.saveName = () => {
   show("roomScreen");
 };
 
+/* CREATE ROOM */
 window.createRoom = async () => {
   roomId = Math.random().toString(36).substring(2,7).toUpperCase();
-  role = "A";
+
   await set(ref(db, "rooms/" + roomId), {
     step: 0,
-    players: { [uid]: { name } }
+    ready: false,
+    players: {
+      [uid]: { name, choice: null }
+    }
   });
+
   roomCode.innerText = roomId;
   show("waitScreen");
   listen();
 };
 
+/* JOIN ROOM */
 window.joinRoom = async () => {
   roomId = roomInput.value.trim().toUpperCase();
-  role = "B";
-  await update(ref(db, "rooms/" + roomId + "/players"), {
-    [uid]: { name }
+  if (!roomId) return;
+
+  await set(ref(db, "rooms/" + roomId + "/players/" + uid), {
+    name,
+    choice: null
   });
+
+  await update(ref(db, "rooms/" + roomId), {
+    ready: true
+  });
+
   show("waitScreen");
   listen();
 };
 
+/* LISTENER */
 function listen() {
   onValue(ref(db, "rooms/" + roomId), snap => {
     const d = snap.val();
-    if (!d || Object.keys(d.players).length < 2) return;
-    step = d.step;
+    if (!d || !d.ready) return;
+    step = d.step || 0;
     startStep(d);
   });
 }
 
+/* START STEP */
 function startStep(d) {
   const s = bakingSteps[d.step];
   if (!s) return;
@@ -209,22 +225,36 @@ function startStep(d) {
   show("gameScreen");
 }
 
+/* CHOOSE */
 window.choose = async (c) => {
-  await update(ref(db, `rooms/${roomId}/players/${uid}`), { choice: c });
-  onValue(ref(db, "rooms/" + roomId + "/players"), snap => {
+  await update(ref(db, `rooms/${roomId}/players/${uid}`), {
+    choice: c
+  });
+
+  onValue(ref(db, `rooms/${roomId}/players`), snap => {
     const players = Object.values(snap.val());
-    if (players.every(p => p.choice)) {
-      const same = players[0].choice === players[1].choice;
-      resultText.innerText = same
-        ? bakingSteps[step].match
-        : bakingSteps[step].diff;
-      show("resultScreen");
-    }
+    if (players.length < 2) return;
+    if (!players.every(p => p.choice)) return;
+
+    const same = players[0].choice === players[1].choice;
+    resultText.innerText = same
+      ? bakingSteps[step].match
+      : bakingSteps[step].diff;
+
+    show("resultScreen");
   }, { onlyOnce: true });
 };
 
+/* NEXT */
 window.nextStep = async () => {
-  await update(ref(db, "rooms/" + roomId), { step: step + 1 });
+  await update(ref(db, "rooms/" + roomId), {
+    step: step + 1,
+    players: Object.fromEntries(
+      Object.entries((await (await fetch(
+        `${firebaseConfig.databaseURL}/rooms/${roomId}/players.json`
+      )).json())).map(([k,v]) => [k,{...v,choice:null}])
+    )
+  });
 };
 </script>
 
