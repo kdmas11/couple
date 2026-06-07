@@ -352,12 +352,13 @@
                     alert("Please enter a Room ID or Invite Link to join!");
                     return;
                 }
-                if (manualInput.includes('?session=')) {
+                // Robust parsing of manual links
+                if (manualInput.includes('session=')) {
                     try {
                         let parsedUrl = new URL(manualInput);
                         joinSessionId = parsedUrl.searchParams.get('session');
                     } catch(e) {
-                        joinSessionId = manualInput.split('?session=')[1];
+                        joinSessionId = manualInput.split('session=')[1];
                     }
                 } else {
                     joinSessionId = manualInput;
@@ -381,21 +382,15 @@
                 document.getElementById('client-name-display').innerText = myName;
 
                 peerInstance.on('open', () => {
-                    activeConnection = peerInstance.connect(joinSessionId);
+                    // Connect with reliable true to ensure handshake messages aren't dropped
+                    activeConnection = peerInstance.connect(joinSessionId, { reliable: true });
                     
-                    // Attach listeners IMMEDIATELY upon initiating connection to avoid race condition
+                    // Attach data listeners IMMEDIATELY
                     setupClientListeners();
                     
                     activeConnection.on('open', () => {
-                        document.getElementById('client-status').innerText = "Connected! Press Ready when you are.";
-                        clientReadyBtn.classList.remove('hidden');
-                        
-                        // Small delay to ensure host is fully ready to receive the name payload
-                        setTimeout(() => {
-                            activeConnection.send({ type: 'SET_NAME', data: myName });
-                        }, 250);
-                        
-                        animate(); // Start render loop
+                        document.getElementById('client-status').innerText = "Synchronizing with Host...";
+                        // We do NOT send our name yet. We wait for the Host to send HOST_ACK to avoid a race condition.
                     });
 
                     activeConnection.on('error', (err) => {
@@ -407,7 +402,7 @@
             } else {
                 // --- WE ARE THE HOST (Player 1) ---
                 isHost = true;
-                gameState.p1Name = myName; // Host sets their name immediately
+                gameState.p1Name = myName; 
                 
                 peerInstance.on('open', (id) => {
                     loadingAuth.classList.add('hidden');
@@ -422,7 +417,6 @@
                             document.getElementById('copy-btn').innerText = "Copied!";
                             setTimeout(() => document.getElementById('copy-btn').innerText = "Copy Link", 2000);
                         }).catch(err => {
-                            // Fallback
                             inviteLinkInput.select();
                             document.execCommand('copy');
                         });
@@ -435,30 +429,30 @@
                 peerInstance.on('connection', (conn) => {
                     activeConnection = conn;
                     
-                    // Attach listeners IMMEDIATELY upon receiving connection to prevent race condition
+                    // Attach data listeners IMMEDIATELY
                     setupHostListeners();
                     
                     activeConnection.on('open', () => {
-                        // Connection fully open
+                        // Crucial Fix: Explicit handshake acknowledging Host is ready to receive
+                        activeConnection.send({ type: 'HOST_ACK' });
                     });
                 });
             }
         }
 
         function setupHostListeners() {
-            // Host listens for Player 2's inputs & name
             activeConnection.on('data', (payload) => {
                 if (payload.type === 'INPUT') {
                     p2RemoteInput = payload.data;
                 }
-                if (payload.type === 'SET_NAME') {
+                else if (payload.type === 'SET_NAME') {
                     gameState.p2Name = payload.data;
                     hostStatus.innerText = `${gameState.p2Name} joined! Press Ready when you are.`;
                     hostStatus.classList.remove('animate-pulse');
                     hostStatus.classList.replace('text-yellow-400', 'text-green-400');
                     startBtn.classList.remove('hidden');
                 }
-                if (payload.type === 'CLIENT_READY') {
+                else if (payload.type === 'CLIENT_READY') {
                     remoteReady = true;
                     if (!localReady) {
                         hostStatus.innerText = `${gameState.p2Name} is ready! Waiting for you.`;
@@ -469,21 +463,28 @@
         }
 
         function setupClientListeners() {
-            // Client listens for Game State updates and Start Events
             if(!activeConnection) return;
             activeConnection.on('data', (payload) => {
-                if (payload.type === 'STATE') {
+                if (payload.type === 'HOST_ACK') {
+                    // Host has explicitly signaled they are ready to receive data
+                    document.getElementById('client-status').innerText = "Connected! Press Ready when you are.";
+                    clientReadyBtn.classList.remove('hidden');
+                    activeConnection.send({ type: 'SET_NAME', data: myName });
+                } 
+                else if (payload.type === 'STATE') {
                     const prevPhase = gameState.phase;
-                    gameState = payload.data; // Overwrite local state with Host state
+                    gameState = payload.data; 
                     
                     if (prevPhase !== gameState.phase && gameState.phase > 0) {
                         showPhaseAnnouncement(gameState.phase);
                     } else if (gameState.phase === 4 && prevPhase !== 4) {
                         showResultsScreen();
                     }
-                } else if (payload.type === 'START') {
+                } 
+                else if (payload.type === 'START') {
                     showControlsScreen();
-                } else if (payload.type === 'HOST_READY') {
+                } 
+                else if (payload.type === 'HOST_READY') {
                     remoteReady = true;
                     if (!localReady) {
                         document.getElementById('client-status').innerText = "Host is ready! Waiting for you.";
@@ -506,7 +507,6 @@
         function syncClientInputToPeer() {
             if (isHost || !activeConnection || !activeConnection.open) return;
             
-            // Map client's actual keyboard to logical P2 inputs
             const currentInput = {
                 left: keys["arrowleft"] || false,
                 right: keys["arrowright"] || false,
@@ -548,7 +548,6 @@
         }
 
         function startGameAsHost() {
-            // Tell client to start
             if (activeConnection && activeConnection.open) {
                 activeConnection.send({ type: 'START' });
             }
@@ -561,7 +560,7 @@
                 gameState.timer = 20;
                 syncHostStateToPeer();
                 showPhaseAnnouncement(1);
-            }, 3000); // Wait on controls screen
+            }, 3000); 
         }
 
         function showControlsScreen() {
