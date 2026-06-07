@@ -15,7 +15,7 @@ body {
 }
 .glass {
   background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
 }
 canvas {
   background: radial-gradient(circle, #2d1b17, #140a08);
@@ -26,7 +26,7 @@ canvas {
 <body class="min-h-screen flex items-center justify-center text-white">
 
 <!-- LOBBY -->
-<div id="lobby" class="glass p-8 rounded-2xl w-[340px] text-center shadow-2xl">
+<div id="lobby" class="glass p-8 rounded-2xl w-[360px] text-center shadow-2xl">
   <h1 class="text-4xl mb-6">🍰 Cozy Kitchen</h1>
 
   <div class="space-y-3">
@@ -54,30 +54,32 @@ canvas {
 </div>
 
 <!-- GAME -->
-<canvas id="game" width="900" height="500" class="hidden rounded-xl shadow-2xl"></canvas>
+<canvas id="game" width="900" height="500"
+        class="hidden rounded-xl shadow-2xl"></canvas>
 
 <script>
-/* ---------- STATE ---------- */
+/* ================== STATE ================== */
 let peer, conn
 let isHost = false
 let localReady = false
 let remoteReady = false
+let remoteAck = false
 let started = false
-let myName = "Player"
 
+/* ================== UI ================== */
 const lobby = document.getElementById("lobby")
 const canvas = document.getElementById("game")
 const ctx = canvas.getContext("2d")
 const status = document.getElementById("status")
 const readyBtn = document.getElementById("readyBtn")
 
-/* ---------- PLAYERS ---------- */
+/* ================== PLAYERS ================== */
 const me = { x: 200, y: 250, emoji: "🦊" }
 const other = { x: 700, y: 250, emoji: "🐰" }
 const speed = 4
 const keys = {}
 
-/* ---------- UI ---------- */
+/* ================== BUTTONS ================== */
 hostBtn.onclick = () => {
   isHost = true
   roomInput.classList.add("hidden")
@@ -91,11 +93,10 @@ joinBtn.onclick = () => {
 }
 
 continueBtn.onclick = () => {
-  myName = nameInput.value || "Player"
   initPeer()
 }
 
-/* ---------- PEER ---------- */
+/* ================== PEER ================== */
 function initPeer() {
   peer = new Peer()
 
@@ -104,30 +105,43 @@ function initPeer() {
       status.innerText = "Room Code: " + id
     } else {
       conn = peer.connect(roomInput.value.trim())
-      setupConn()
+      attachConn()
     }
   })
 
   peer.on("connection", c => {
     if (!conn) {
       conn = c
-      setupConn()
+      attachConn()
     }
   })
 }
 
-function setupConn() {
+function attachConn() {
   conn.on("open", () => {
     status.innerText = "Connected — press READY"
     readyBtn.classList.remove("hidden")
+
+    // 🔑 ACK ensures listener is ready
+    conn.send({ type: "ACK" })
   })
 
   conn.on("data", msg => {
-    if (msg.type === "READY") {
-      remoteReady = true
+    if (msg.type === "ACK") {
+      remoteAck = true
       checkStart()
     }
-    if (msg.type === "START") startGame()
+
+    if (msg.type === "READY") {
+      remoteReady = true
+      status.innerText = "Other player ready"
+      checkStart()
+    }
+
+    if (msg.type === "START") {
+      startGame()
+    }
+
     if (msg.type === "MOVE") {
       other.x = msg.x
       other.y = msg.y
@@ -135,23 +149,32 @@ function setupConn() {
   })
 }
 
-/* ---------- READY ---------- */
+/* ================== READY ================== */
 readyBtn.onclick = () => {
+  if (localReady) return
+
   localReady = true
   readyBtn.disabled = true
   readyBtn.innerText = "Waiting..."
+  status.innerText = "Waiting for other player..."
+
   conn.send({ type: "READY" })
   checkStart()
 }
 
+/* ================== START CHECK ================== */
 function checkStart() {
-  if (localReady && remoteReady && isHost && !started) {
+  if (started) return
+
+  // 🔒 Host is authoritative
+  if (isHost && localReady && remoteReady && remoteAck) {
+    started = true
     conn.send({ type: "START" })
     startGame()
   }
 }
 
-/* ---------- GAME ---------- */
+/* ================== GAME ================== */
 function startGame() {
   if (started) return
   started = true
@@ -182,7 +205,6 @@ function update() {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-
   ctx.font = "60px serif"
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
@@ -191,7 +213,7 @@ function draw() {
   ctx.fillText(other.emoji, other.x, other.y)
 }
 
-/* ---------- INPUT ---------- */
+/* ================== INPUT ================== */
 window.addEventListener("keydown", e => keys[e.key] = true)
 window.addEventListener("keyup", e => keys[e.key] = false)
 </script>
