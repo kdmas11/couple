@@ -1,210 +1,231 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Couples Compatibility Game</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<title>Bake Our Love 💖</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .card {
-      background: #1c1c1c;
-      padding: 20px;
-      border-radius: 10px;
-      width: 320px;
-      text-align: center;
-    }
-    button {
-      padding: 10px;
-      margin: 8px 0;
-      width: 100%;
-      background: #ff4d6d;
-      border: none;
-      color: #fff;
-      font-size: 16px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    input {
-      padding: 10px;
-      width: 100%;
-      border-radius: 6px;
-      border: none;
-      margin-bottom: 10px;
-    }
-    .hidden { display: none; }
-  </style>
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    background: linear-gradient(135deg, #ff758c, #ff7eb3);
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #333;
+  }
+
+  .card {
+    background: #fff;
+    width: 340px;
+    border-radius: 16px;
+    padding: 22px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,.15);
+  }
+
+  h2 { margin-top: 0 }
+
+  input {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    margin-bottom: 12px;
+  }
+
+  button {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    border-radius: 12px;
+    border: none;
+    background: #ff4d6d;
+    color: white;
+    margin-top: 8px;
+    cursor: pointer;
+    transition: transform .1s ease, box-shadow .1s ease;
+    box-shadow: 0 6px 0 #e63950;
+  }
+
+  button:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 #e63950;
+  }
+
+  .soft {
+    background: #ffd6de;
+    color: #333;
+    box-shadow: 0 6px 0 #ffb3c1;
+  }
+
+  .hidden { display: none }
+</style>
 </head>
 
 <body>
 
 <div class="card">
 
-  <!-- HOME -->
-  <div id="home">
-    <h2>💖 Couples Game</h2>
-    <button onclick="createRoom()">Create Room</button>
-    <input id="roomInput" placeholder="Enter Room Code" />
-    <button onclick="joinRoom()">Join Room</button>
+  <!-- NAME -->
+  <div id="nameScreen">
+    <h2>💖 Bake Our Love</h2>
+    <p>What should your partner call you?</p>
+    <input id="nameInput" placeholder="Your name" />
+    <button onclick="saveName()">Continue</button>
   </div>
 
-  <!-- WAITING -->
-  <div id="waiting" class="hidden">
-    <h3>Waiting for partner…</h3>
-    <h2 id="roomCode"></h2>
+  <!-- ROOM -->
+  <div id="roomScreen" class="hidden">
+    <h2>Hello <span id="myName"></span> 👋</h2>
+    <button onclick="createRoom()">Create Room</button>
+    <input id="roomInput" placeholder="Enter partner's code" />
+    <button class="soft" onclick="joinRoom()">Join Room</button>
+  </div>
+
+  <!-- WAIT -->
+  <div id="waitScreen" class="hidden">
+    <h2>Waiting for your partner…</h2>
+    <h1 id="roomCode"></h1>
+    <p>Share this code ❤️</p>
   </div>
 
   <!-- GAME -->
-  <div id="game" class="hidden">
-    <h3 id="question"></h3>
-    <button onclick="submitAnswer('A')">Option A</button>
-    <button onclick="submitAnswer('B')">Option B</button>
+  <div id="gameScreen" class="hidden">
+    <h2 id="gameText"></h2>
+    <button onclick="choose('A')" id="btnA"></button>
+    <button onclick="choose('B')" class="soft" id="btnB"></button>
   </div>
 
   <!-- RESULT -->
-  <div id="result" class="hidden">
-    <h3 id="resultText"></h3>
-    <button onclick="nextQuestion()">Next</button>
+  <div id="resultScreen" class="hidden">
+    <h2 id="resultText"></h2>
+    <button onclick="nextStep()">Continue Baking</button>
   </div>
 
 </div>
 
-<!-- 🔥 FIREBASE + GAME LOGIC -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import {
-    getDatabase,
-    ref,
-    set,
-    update,
-    onValue
-  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-  // ✅ YOUR FIREBASE CONFIG (UNCHANGED)
-  const firebaseConfig = {
-    apiKey: "AIzaSyAlN3n35NJQI2-mdNnVW7oyWSu3RN2YQsw",
-    authDomain: "couplegame-ee52e.firebaseapp.com",
-    databaseURL: "https://couplegame-ee52e-default-rtdb.firebaseio.com",
-    projectId: "couplegame-ee52e",
-    storageBucket: "couplegame-ee52e.firebasestorage.app",
-    messagingSenderId: "340161084050",
-    appId: "1:340161084050:web:82b571b0711a48ca30c44b"
-  };
+/* FIREBASE CONFIG (UNCHANGED) */
+const firebaseConfig = {
+  apiKey: "AIzaSyAlN3n35NJQI2-mdNnVW7oyWSu3RN2YQsw",
+  authDomain: "couplegame-ee52e.firebaseapp.com",
+  databaseURL: "https://couplegame-ee52e-default-rtdb.firebaseio.com",
+  projectId: "couplegame-ee52e",
+  storageBucket: "couplegame-ee52e.firebasestorage.app",
+  messagingSenderId: "340161084050",
+  appId: "1:340161084050:web:82b571b0711a48ca30c44b"
+};
 
-  // INIT
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getDatabase(app);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
 
-  let userId, roomId, role;
-  let currentQuestion = 0;
+let uid, name, roomId, role, step = 0;
 
-  const questions = [
-    "How do you handle arguments?",
-    "What matters more: time or money?",
-    "Are you a planner or spontaneous?"
-  ];
-
-  // AUTH
-  signInAnonymously(auth).then(res => {
-    userId = res.user.uid;
-  });
-
-  // CREATE ROOM
-  window.createRoom = async () => {
-    roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
-    role = "playerA";
-
-    await set(ref(db, "rooms/" + roomId), {
-      questionIndex: 0,
-      playerA: {},
-      playerB: {},
-      status: "waiting"
-    });
-
-    document.getElementById("home").classList.add("hidden");
-    document.getElementById("waiting").classList.remove("hidden");
-    document.getElementById("roomCode").innerText = roomId;
-
-    listenRoom();
-  };
-
-  // JOIN ROOM
-  window.joinRoom = async () => {
-    roomId = document.getElementById("roomInput").value.trim().toUpperCase();
-    if (!roomId) return alert("Enter room code");
-
-    role = "playerB";
-
-    await update(ref(db, "rooms/" + roomId), {
-      status: "ready"
-    });
-
-    document.getElementById("home").classList.add("hidden");
-    document.getElementById("waiting").classList.remove("hidden");
-
-    listenRoom();
-  };
-
-  // REALTIME LISTENER
-  function listenRoom() {
-    onValue(ref(db, "rooms/" + roomId), snapshot => {
-      const data = snapshot.val();
-      if (!data) return;
-
-      if (data.status === "ready") {
-        document.getElementById("waiting").classList.add("hidden");
-        document.getElementById("game").classList.remove("hidden");
-        document.getElementById("question").innerText =
-          questions[data.questionIndex];
-      }
-
-      if (data.playerA?.answer && data.playerB?.answer) {
-        document.getElementById("game").classList.add("hidden");
-        document.getElementById("result").classList.remove("hidden");
-
-        const match = data.playerA.answer === data.playerB.answer;
-        document.getElementById("resultText").innerText =
-          match ? "💚 Great match!" : "💬 Different views — talk about it!";
-      }
-    });
+const bakingSteps = [
+  {
+    text: "Choose a base 🥣",
+    A: "Chocolate",
+    B: "Vanilla",
+    match: "Sweet harmony! You enjoy similar comforts ❤️",
+    diff: "Different tastes — great chance to surprise each other 💬"
+  },
+  {
+    text: "How patient are you while baking?",
+    A: "Low heat, slow bake",
+    B: "High heat, quick finish",
+    match: "You move at the same pace — lovely rhythm 💞",
+    diff: "One rushes, one waits — communication makes magic ✨"
+  },
+  {
+    text: "Final touch?",
+    A: "Simple & clean",
+    B: "Extra decorations",
+    match: "Shared vision — your love shows ❤️",
+    diff: "Different styles — blend them for beauty 🎂"
   }
+];
 
-  // SUBMIT ANSWER
-  window.submitAnswer = async (ans) => {
-    await update(ref(db, "rooms/" + roomId + "/" + role), {
-      answer: ans
-    });
-  };
+signInAnonymously(auth).then(r => uid = r.user.uid);
 
-  // NEXT QUESTION
-  window.nextQuestion = async () => {
-    currentQuestion++;
-    if (currentQuestion >= questions.length) {
-      alert("Game Over ❤️");
-      location.reload();
-      return;
+/* UI helpers */
+const show = id => {
+  document.querySelectorAll(".card > div").forEach(d => d.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+};
+
+window.saveName = () => {
+  name = nameInput.value.trim();
+  if (!name) return;
+  myName.innerText = name;
+  show("roomScreen");
+};
+
+window.createRoom = async () => {
+  roomId = Math.random().toString(36).substring(2,7).toUpperCase();
+  role = "A";
+  await set(ref(db, "rooms/" + roomId), {
+    step: 0,
+    players: { [uid]: { name } }
+  });
+  roomCode.innerText = roomId;
+  show("waitScreen");
+  listen();
+};
+
+window.joinRoom = async () => {
+  roomId = roomInput.value.trim().toUpperCase();
+  role = "B";
+  await update(ref(db, "rooms/" + roomId + "/players"), {
+    [uid]: { name }
+  });
+  show("waitScreen");
+  listen();
+};
+
+function listen() {
+  onValue(ref(db, "rooms/" + roomId), snap => {
+    const d = snap.val();
+    if (!d || Object.keys(d.players).length < 2) return;
+    step = d.step;
+    startStep(d);
+  });
+}
+
+function startStep(d) {
+  const s = bakingSteps[d.step];
+  if (!s) return;
+  gameText.innerText = s.text;
+  btnA.innerText = s.A;
+  btnB.innerText = s.B;
+  show("gameScreen");
+}
+
+window.choose = async (c) => {
+  await update(ref(db, `rooms/${roomId}/players/${uid}`), { choice: c });
+  onValue(ref(db, "rooms/" + roomId + "/players"), snap => {
+    const players = Object.values(snap.val());
+    if (players.every(p => p.choice)) {
+      const same = players[0].choice === players[1].choice;
+      resultText.innerText = same
+        ? bakingSteps[step].match
+        : bakingSteps[step].diff;
+      show("resultScreen");
     }
+  }, { onlyOnce: true });
+};
 
-    await update(ref(db, "rooms/" + roomId), {
-      questionIndex: currentQuestion,
-      playerA: {},
-      playerB: {}
-    });
-
-    document.getElementById("result").classList.add("hidden");
-    document.getElementById("game").classList.remove("hidden");
-  };
+window.nextStep = async () => {
+  await update(ref(db, "rooms/" + roomId), { step: step + 1 });
+};
 </script>
 
 </body>
