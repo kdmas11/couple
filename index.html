@@ -128,22 +128,38 @@
             <h1 class="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">Cozy Kitchen</h1>
             <h2 class="text-2xl mb-8">Multiplayer Co-op</h2>
             
-            <div id="loading-auth" class="text-xl text-yellow-400 mb-4 animate-pulse">Connecting to P2P network...</div>
+            <!-- Mode Selection Section -->
+            <div id="mode-selection-section" class="flex flex-col items-center gap-4 mb-6">
+                <button id="btn-select-host" class="btn-primary w-64 text-lg py-4">Host a Game</button>
+                <button id="btn-select-join" class="btn-secondary w-64 text-lg py-4">Join a Game</button>
+            </div>
+
+            <!-- Name Entry Section -->
+            <div id="name-entry-section" class="flex flex-col items-center mb-6 hidden">
+                <h3 id="name-entry-title" class="text-xl mb-4 font-bold text-gray-300"></h3>
+                <input type="text" id="manual-session-id" placeholder="Paste Invite Link or Room ID..." class="px-6 py-3 rounded-full text-black font-bold outline-none mb-4 text-center w-80 text-sm border-4 border-transparent focus:border-[#4db6ac] transition-colors hidden">
+                <input type="text" id="player-name" placeholder="Enter your name..." class="px-6 py-3 rounded-full text-black font-bold outline-none mb-4 text-center w-64 text-lg border-4 border-transparent focus:border-[#ff8a98] transition-colors">
+                <button id="action-btn" class="btn-primary w-64"></button>
+                <button id="back-btn" class="mt-4 text-sm text-gray-400 hover:text-white underline">Back</button>
+            </div>
+
+            <div id="loading-auth" class="text-xl text-yellow-400 mb-4 animate-pulse hidden">Connecting to P2P network...</div>
 
             <div id="host-controls" class="hidden flex flex-col items-center">
-                <p class="mb-4 text-lg text-gray-300">You are <span class="font-bold text-[#ff8a98]">Player 1 (Host) 🦊</span></p>
+                <p class="mb-4 text-lg text-gray-300">You are <span id="host-name-display" class="font-bold text-[#ff8a98]"></span> 🦊</p>
                 <div class="bg-[#3e3230] p-4 rounded-lg mb-6 w-96 text-center border border-gray-600">
-                    <p class="text-sm text-gray-400 mb-2">Send this link to Player 2:</p>
+                    <p class="text-sm text-gray-400 mb-2">Send this link to your partner:</p>
                     <input type="text" id="invite-link" readonly class="w-full bg-[#1e1615] text-white p-2 rounded text-center text-sm border border-gray-700 outline-none" value="Generating...">
-                    <button id="copy-btn" class="mt-3 text-sm bg-gray-700 hover:bg-gray-600 px-4 py-1 rounded">Copy Link</button>
+                    <button id="copy-btn" class="mt-3 text-sm bg-gray-700 hover:bg-gray-600 px-4 py-1 rounded transition-colors">Copy Link</button>
                 </div>
-                <div id="host-status" class="text-yellow-400 mb-6 font-bold animate-pulse">Waiting for Player 2 to join...</div>
-                <button id="start-btn" class="btn-primary hidden">Start Game</button>
+                <div id="host-status" class="text-yellow-400 mb-6 font-bold animate-pulse">Waiting for your partner to join...</div>
+                <button id="start-btn" class="btn-primary hidden">Ready</button>
             </div>
 
             <div id="client-controls" class="hidden flex flex-col items-center">
-                <p class="mb-4 text-lg text-gray-300">You are <span class="font-bold text-[#4db6ac]">Player 2 (Guest) 🐰</span></p>
+                <p class="mb-4 text-lg text-gray-300">You are <span id="client-name-display" class="font-bold text-[#4db6ac]"></span> 🐰</p>
                 <div id="client-status" class="text-green-400 mb-6 font-bold">Connecting to Host...</div>
+                <button id="client-ready-btn" class="btn-primary hidden">Ready</button>
             </div>
         </div>
 
@@ -208,6 +224,9 @@
         let p2RemoteInput = { left: false, right: false, up: false };
         let lastSyncTime = 0;
         const SYNC_RATE_MS = 50; // Sync game state 20 times per second
+        let myName = "";
+        let localReady = false;
+        let remoteReady = false;
 
         // Canvas & Local Game Setup
         const canvas = document.getElementById("gameCanvas");
@@ -221,18 +240,34 @@
 
         // UI Elements
         const lobbyScreen = document.getElementById('lobby-screen');
+        const modeSelectionSection = document.getElementById('mode-selection-section');
+        const btnSelectHost = document.getElementById('btn-select-host');
+        const btnSelectJoin = document.getElementById('btn-select-join');
+        const nameEntrySection = document.getElementById('name-entry-section');
+        const nameEntryTitle = document.getElementById('name-entry-title');
+        const manualSessionIdInput = document.getElementById('manual-session-id');
+        const backBtn = document.getElementById('back-btn');
+        const playerNameInput = document.getElementById('player-name');
+        const actionBtn = document.getElementById('action-btn');
         const hostControls = document.getElementById('host-controls');
         const clientControls = document.getElementById('client-controls');
         const loadingAuth = document.getElementById('loading-auth');
         const inviteLinkInput = document.getElementById('invite-link');
         const hostStatus = document.getElementById('host-status');
         const startBtn = document.getElementById('start-btn');
+        const clientReadyBtn = document.getElementById('client-ready-btn');
         const setupScreen = document.getElementById('setup-screen');
+
+        const urlParams = new URLSearchParams(window.location.search);
+        let joinSessionId = urlParams.get('session');
+        let isHostingFlow = true;
 
         // Global Game State Structure
         let gameState = {
             phase: 0, // 0: Lobby, 1: Gather, 2: Whip, 3: Bake, 4: Results
             timer: 20,
+            p1Name: "Player 1",
+            p2Name: "Player 2",
             p1: { x: W * 0.25, score: 0, wPressed: false },
             p2: { x: W * 0.75, score: 0, upPressed: false },
             items: [], // {x, y, emoji, speed}
@@ -258,24 +293,100 @@
         let lastLocalUpdate = Date.now();
         let animationFrameId;
 
+        // --- PRE-MULTIPLAYER SETUP ---
+        if (joinSessionId) {
+            // Arrived via direct link
+            modeSelectionSection.classList.add('hidden');
+            nameEntrySection.classList.remove('hidden');
+            isHostingFlow = false;
+            setupNameEntryUI();
+        } else {
+            // Default to Mode Selection
+            modeSelectionSection.classList.remove('hidden');
+            nameEntrySection.classList.add('hidden');
+        }
+
+        btnSelectHost.addEventListener('click', () => {
+            isHostingFlow = true;
+            modeSelectionSection.classList.add('hidden');
+            nameEntrySection.classList.remove('hidden');
+            setupNameEntryUI();
+        });
+
+        btnSelectJoin.addEventListener('click', () => {
+            isHostingFlow = false;
+            modeSelectionSection.classList.add('hidden');
+            nameEntrySection.classList.remove('hidden');
+            setupNameEntryUI();
+        });
+
+        backBtn.addEventListener('click', () => {
+            nameEntrySection.classList.add('hidden');
+            modeSelectionSection.classList.remove('hidden');
+        });
+
+        function setupNameEntryUI() {
+            if (isHostingFlow) {
+                nameEntryTitle.innerText = "Host a New Game";
+                manualSessionIdInput.classList.add('hidden');
+                actionBtn.innerText = "Create Room";
+                playerNameInput.classList.replace('focus:border-[#4db6ac]', 'focus:border-[#ff8a98]');
+            } else {
+                nameEntryTitle.innerText = "Join a Game";
+                if (!joinSessionId) {
+                    manualSessionIdInput.classList.remove('hidden');
+                } else {
+                    manualSessionIdInput.classList.add('hidden');
+                }
+                actionBtn.innerText = "Connect";
+                playerNameInput.classList.replace('focus:border-[#ff8a98]', 'focus:border-[#4db6ac]');
+            }
+        }
+
+        actionBtn.addEventListener('click', () => {
+            myName = playerNameInput.value.trim() || (isHostingFlow ? "Host" : "Guest");
+            
+            if (!isHostingFlow && !joinSessionId) {
+                let manualInput = manualSessionIdInput.value.trim();
+                if (!manualInput) {
+                    alert("Please enter a Room ID or Invite Link to join!");
+                    return;
+                }
+                if (manualInput.includes('?session=')) {
+                    try {
+                        let parsedUrl = new URL(manualInput);
+                        joinSessionId = parsedUrl.searchParams.get('session');
+                    } catch(e) {
+                        joinSessionId = manualInput.split('?session=')[1];
+                    }
+                } else {
+                    joinSessionId = manualInput;
+                }
+            }
+
+            nameEntrySection.classList.add('hidden');
+            loadingAuth.classList.remove('hidden');
+            initMultiplayer();
+        });
+
         // --- PEER.JS MULTIPLAYER LOGIC ---
         function initMultiplayer() {
             peerInstance = new Peer();
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const joinSessionId = urlParams.get('session');
-
-            if (joinSessionId) {
+            if (!isHostingFlow) {
                 // --- WE ARE THE CLIENT (Player 2) ---
                 isHost = false;
                 loadingAuth.classList.add('hidden');
                 clientControls.classList.remove('hidden');
+                document.getElementById('client-name-display').innerText = myName;
 
                 peerInstance.on('open', () => {
                     activeConnection = peerInstance.connect(joinSessionId);
                     
                     activeConnection.on('open', () => {
-                        document.getElementById('client-status').innerText = "Connected! Waiting for Host to start...";
+                        document.getElementById('client-status').innerText = "Connected! Press Ready when you are.";
+                        clientReadyBtn.classList.remove('hidden');
+                        activeConnection.send({ type: 'SET_NAME', data: myName });
                         setupClientListeners();
                         animate(); // Start render loop
                     });
@@ -289,10 +400,12 @@
             } else {
                 // --- WE ARE THE HOST (Player 1) ---
                 isHost = true;
+                gameState.p1Name = myName; // Host sets their name immediately
                 
                 peerInstance.on('open', (id) => {
                     loadingAuth.classList.add('hidden');
                     hostControls.classList.remove('hidden');
+                    document.getElementById('host-name-display').innerText = myName;
                     
                     const inviteUrl = `${window.location.origin}${window.location.pathname}?session=${id}`;
                     inviteLinkInput.value = inviteUrl;
@@ -316,10 +429,6 @@
                     activeConnection = conn;
                     
                     activeConnection.on('open', () => {
-                        hostStatus.innerText = "Player 2 joined! Ready to bake.";
-                        hostStatus.classList.remove('animate-pulse');
-                        hostStatus.classList.replace('text-yellow-400', 'text-green-400');
-                        startBtn.classList.remove('hidden');
                         setupHostListeners();
                     });
                 });
@@ -327,10 +436,24 @@
         }
 
         function setupHostListeners() {
-            // Host listens for Player 2's inputs
+            // Host listens for Player 2's inputs & name
             activeConnection.on('data', (payload) => {
                 if (payload.type === 'INPUT') {
                     p2RemoteInput = payload.data;
+                }
+                if (payload.type === 'SET_NAME') {
+                    gameState.p2Name = payload.data;
+                    hostStatus.innerText = `${gameState.p2Name} joined! Press Ready when you are.`;
+                    hostStatus.classList.remove('animate-pulse');
+                    hostStatus.classList.replace('text-yellow-400', 'text-green-400');
+                    startBtn.classList.remove('hidden');
+                }
+                if (payload.type === 'CLIENT_READY') {
+                    remoteReady = true;
+                    if (!localReady) {
+                        hostStatus.innerText = `${gameState.p2Name} is ready! Waiting for you.`;
+                    }
+                    checkBothReady();
                 }
             });
         }
@@ -349,6 +472,11 @@
                     }
                 } else if (payload.type === 'START') {
                     showControlsScreen();
+                } else if (payload.type === 'HOST_READY') {
+                    remoteReady = true;
+                    if (!localReady) {
+                        document.getElementById('client-status').innerText = "Host is ready! Waiting for you.";
+                    }
                 }
             });
         }
@@ -382,8 +510,31 @@
         }
 
         startBtn.addEventListener('click', () => {
-            startGameAsHost();
+            localReady = true;
+            startBtn.innerText = "Waiting for Player 2...";
+            startBtn.disabled = true;
+            startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            if (activeConnection && activeConnection.open) {
+                activeConnection.send({ type: 'HOST_READY' });
+            }
+            checkBothReady();
         });
+
+        clientReadyBtn.addEventListener('click', () => {
+            localReady = true;
+            clientReadyBtn.innerText = "Waiting for Host...";
+            clientReadyBtn.disabled = true;
+            clientReadyBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            if (activeConnection && activeConnection.open) {
+                activeConnection.send({ type: 'CLIENT_READY' });
+            }
+        });
+
+        function checkBothReady() {
+            if (isHost && localReady && remoteReady) {
+                startGameAsHost();
+            }
+        }
 
         function startGameAsHost() {
             // Tell client to start
@@ -411,7 +562,7 @@
                 controlsDiv.innerHTML = `
                     <div class="bg-[#3e3230] p-6 rounded-xl text-center border-2 border-[#ff8a98]">
                         <div class="text-4xl mb-2">🦊</div>
-                        <h3 class="text-xl font-bold text-[#ff8a98]">Player 1 (You)</h3>
+                        <h3 class="text-xl font-bold text-[#ff8a98]">${gameState.p1Name} (Host)</h3>
                         <p class="text-sm mt-2">Use <kbd class="bg-gray-700 px-2 rounded">A</kbd> <kbd class="bg-gray-700 px-2 rounded">D</kbd> to move</p>
                         <p class="text-sm">Use <kbd class="bg-gray-700 px-2 rounded">W</kbd> to action</p>
                     </div>`;
@@ -419,7 +570,7 @@
                 controlsDiv.innerHTML = `
                     <div class="bg-[#3e3230] p-6 rounded-xl text-center border-2 border-[#4db6ac]">
                         <div class="text-4xl mb-2">🐰</div>
-                        <h3 class="text-xl font-bold text-[#4db6ac]">Player 2 (You)</h3>
+                        <h3 class="text-xl font-bold text-[#4db6ac]">${gameState.p2Name} (Guest)</h3>
                         <p class="text-sm mt-2">Use <kbd class="bg-gray-700 px-2 rounded">←</kbd> <kbd class="bg-gray-700 px-2 rounded">→</kbd> to move</p>
                         <p class="text-sm">Use <kbd class="bg-gray-700 px-2 rounded">↑</kbd> to action</p>
                     </div>`;
@@ -705,9 +856,9 @@
             ctx.fillText(`Whip together when rings align! (${gameState.phase2Hits}/10)`, cx, 50);
             
             ctx.fillStyle = "#ff8a98";
-            ctx.fillText(`P1 (Host): Tap W`, cx - 180, H - 50);
+            ctx.fillText(`${gameState.p1Name} (Host): Tap W`, cx - 180, H - 50);
             ctx.fillStyle = "#4db6ac";
-            ctx.fillText(`P2 (Guest): Tap UP`, cx + 180, H - 50);
+            ctx.fillText(`${gameState.p2Name} (Guest): Tap UP`, cx + 180, H - 50);
 
             // Local player highlight text
             if (isHost) {
@@ -794,17 +945,17 @@
 
             ctx.font = "bold 14px 'Quicksand'";
             ctx.fillStyle = "#ff8a98";
-            ctx.fillText(isHost ? `P1 STOKE (Tap W) [YOU]` : `P1 STOKE (Host)`, cx - 180, cy + 50);
+            ctx.fillText(isHost ? `${gameState.p1Name} STOKE (Tap W) [YOU]` : `${gameState.p1Name} STOKE (Host)`, cx - 180, cy + 50);
             ctx.fillStyle = "#4db6ac";
-            ctx.fillText(!isHost ? `P2 VENT (Tap UP) [YOU]` : `P2 VENT (Guest)`, cx + 180, cy + 50);
+            ctx.fillText(!isHost ? `${gameState.p2Name} VENT (Tap UP) [YOU]` : `${gameState.p2Name} VENT (Guest)`, cx + 180, cy + 50);
 
             ctx.font = "bold 18px 'Quicksand'";
             if (gameState.ovenTemp < 40) {
                 ctx.fillStyle = "#ffb74d";
-                ctx.fillText("⚠️ Too cold! P1, heat it up!", cx, cy - 80);
+                ctx.fillText(`⚠️ Too cold! ${gameState.p1Name}, heat it up!`, cx, cy - 80);
             } else if (gameState.ovenTemp > 60) {
                 ctx.fillStyle = "#e57373";
-                ctx.fillText("⚠️ Burning! P2, vent cool air!", cx, cy - 80);
+                ctx.fillText(`⚠️ Burning! ${gameState.p2Name}, vent cool air!`, cx, cy - 80);
             } else {
                 ctx.fillStyle = "#81c784";
                 ctx.fillText("✨ Perfect sweet spot! ✨", cx, cy - 80);
@@ -891,9 +1042,6 @@
 
             animationFrameId = requestAnimationFrame(animate);
         }
-
-        // Initialize PeerJS when page loads
-        window.addEventListener('load', initMultiplayer);
 
     </script>
 </body>
