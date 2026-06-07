@@ -359,7 +359,6 @@
 
 <div class="card">
 
-  <!-- NAME SCREEN -->
   <div class="screen active" id="nameScreen">
     <span class="emoji-big">🍰</span>
     <h1>Bake Together</h1>
@@ -369,7 +368,6 @@
     <button class="btn btn-primary" onclick="saveName()">Let's Begin →</button>
   </div>
 
-  <!-- ROOM SCREEN -->
   <div class="screen" id="roomScreen">
     <h2>Hello, <span id="myName" style="color:var(--caramel)"></span> 👋</h2>
     <p class="subtitle">Find your partner</p>
@@ -379,7 +377,6 @@
     <button class="btn btn-secondary" onclick="joinRoom()">Join Room</button>
   </div>
 
-  <!-- WAIT SCREEN -->
   <div class="screen" id="waitScreen">
     <span class="emoji-big">⏳</span>
     <h2>Almost there…</h2>
@@ -389,7 +386,6 @@
     <p style="font-size:.85rem;color:#b88a80;">Waiting for them to join 💌</p>
   </div>
 
-  <!-- GAME SCREEN -->
   <div class="screen" id="gameScreen">
     <div class="progress-track" id="progressTrack"></div>
     <div class="quest-banner" id="questBanner">
@@ -413,7 +409,6 @@
     <button class="btn btn-ghost" id="skipQuestBtn" style="margin-top:14px;display:none" onclick="skipQuest()">Skip quest →</button>
   </div>
 
-  <!-- RESULT SCREEN -->
   <div class="screen" id="resultScreen">
     <div style="text-align:center;margin-bottom:6px">
       <div class="result-badge" id="matchBadge"></div>
@@ -426,7 +421,6 @@
     <p style="font-size:.78rem;text-align:center;color:#b88a80;margin-top:8px" id="waitNextHint"></p>
   </div>
 
-  <!-- REPORT SCREEN -->
   <div class="screen" id="reportScreen">
     <div class="scrollable">
       <span class="emoji-big" style="text-align:center">🎂</span>
@@ -485,6 +479,9 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getDatabase(app);
+
+// Generate a random ID unique to this tab session to allow same-browser testing
+const myPlayerId = Math.random().toString(36).substring(2, 10);
 
 let uid, myName, roomId, isCreator = false;
 let currentStep     = 0;
@@ -601,7 +598,7 @@ window.createRoom = async () => {
   await set(ref(db, 'rooms/' + roomId), {
     step: 0,
     ready: false,
-    players: { [uid]: { name: myName, choice: null, choiceTime: null } }
+    players: { [myPlayerId]: { name: myName, choice: null, choiceTime: null } }
   });
   $('roomCodeDisplay').innerText = roomId;
   show('waitScreen');
@@ -612,7 +609,7 @@ window.createRoom = async () => {
 window.joinRoom = async () => {
   roomId = $('roomInput').value.trim().toUpperCase();
   if (!roomId) return;
-  await set(ref(db, `rooms/${roomId}/players/${uid}`), { name: myName, choice: null, choiceTime: null });
+  await set(ref(db, `rooms/${roomId}/players/${myPlayerId}`), { name: myName, choice: null, choiceTime: null });
   await update(ref(db, 'rooms/' + roomId), { ready: true });
   show('waitScreen');
   listenRoom();
@@ -697,7 +694,7 @@ function showStep(d) {
   stepStartTime = Date.now();
 
   // Restore my choice if I already picked (e.g. page refresh / reconnect)
-  const myData = d.players?.[uid];
+  const myData = d.players?.[myPlayerId];
   if (myData?.choice) {
     highlightChoice(myData.choice);
     $('waitingHint').classList.remove('hidden');
@@ -750,7 +747,7 @@ window.choose = async (c) => {
   $('waitingHint').classList.remove('hidden');
 
   // Write to Firebase — listenRoom will detect when both have chosen
-  await update(ref(db, `rooms/${roomId}/players/${uid}`), {
+  await update(ref(db, `rooms/${roomId}/players/${myPlayerId}`), {
     choice: c,
     choiceTime: myChoiceTime
   });
@@ -769,9 +766,7 @@ function processResult(players) {
   if (p0.choiceTime && p1.choiceTime) {
     analytics.responsiveness.push(Math.abs(p0.choiceTime - p1.choiceTime));
     // Initiator: whoever chose first
-    const firstUid = p0.choiceTime < p1.choiceTime ? p0 : p1;
-    // We track whether "me" or "partner" went first more often
-    // (approximate: compare my uid vs others)
+    const firstId = p0.choiceTime < p1.choiceTime ? p0 : p1;
   }
 
   // Quest completion — rough heuristic: if quest had timer and both chose within window
