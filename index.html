@@ -6,6 +6,8 @@
     <title>Cozy Kitchen Baking Challenge - Multiplayer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- PeerJS for WebRTC real-time P2P Online Multiplayer -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
     <style>
         body {
             font-family: 'Quicksand', sans-serif;
@@ -126,7 +128,7 @@
             <h1 class="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">Cozy Kitchen</h1>
             <h2 class="text-2xl mb-8">Multiplayer Co-op</h2>
             
-            <div id="loading-auth" class="text-xl text-yellow-400 mb-4 animate-pulse">Connecting to servers...</div>
+            <div id="loading-auth" class="text-xl text-yellow-400 mb-4 animate-pulse">Connecting to P2P network...</div>
 
             <div id="host-controls" class="hidden flex flex-col items-center">
                 <p class="mb-4 text-lg text-gray-300">You are <span class="font-bold text-[#ff8a98]">Player 1 (Host) 🦊</span></p>
@@ -141,7 +143,7 @@
 
             <div id="client-controls" class="hidden flex flex-col items-center">
                 <p class="mb-4 text-lg text-gray-300">You are <span class="font-bold text-[#4db6ac]">Player 2 (Guest) 🐰</span></p>
-                <div id="client-status" class="text-green-400 mb-6 font-bold">Connected! Waiting for Host to start...</div>
+                <div id="client-status" class="text-green-400 mb-6 font-bold">Connecting to Host...</div>
             </div>
         </div>
 
@@ -198,25 +200,11 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase Configuration (Injected by environment)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-kitchen-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // Multiplayer State Variables
+    <script>
+        // Multiplayer State Variables (Peer.js)
+        let peerInstance = null;
+        let activeConnection = null;
         let isHost = true;
-        let sessionId = null;
-        let userId = null;
-        let sessionRef = null;
         let p2RemoteInput = { left: false, right: false, up: false };
         let lastSyncTime = 0;
         const SYNC_RATE_MS = 50; // Sync game state 20 times per second
@@ -270,35 +258,43 @@
         let lastLocalUpdate = Date.now();
         let animationFrameId;
 
-        async function initMultiplayer() {
-            try {
-                if (authToken) {
-                    await signInWithCustomToken(auth, authToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-                userId = auth.currentUser.uid;
+        // --- PEER.JS MULTIPLAYER LOGIC ---
+        function initMultiplayer() {
+            peerInstance = new Peer();
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const joinSessionId = urlParams.get('session');
+
+            if (joinSessionId) {
+                // --- WE ARE THE CLIENT (Player 2) ---
+                isHost = false;
                 loadingAuth.classList.add('hidden');
+                clientControls.classList.remove('hidden');
 
-                // Check URL for session invite
-                const urlParams = new URLSearchParams(window.location.search);
-                const joinSessionId = urlParams.get('session');
+                peerInstance.on('open', () => {
+                    activeConnection = peerInstance.connect(joinSessionId);
+                    
+                    activeConnection.on('open', () => {
+                        document.getElementById('client-status').innerText = "Connected! Waiting for Host to start...";
+                        setupClientListeners();
+                        animate(); // Start render loop
+                    });
 
-                if (joinSessionId) {
-                    // We are the Client
-                    isHost = false;
-                    sessionId = joinSessionId;
-                    clientControls.classList.remove('hidden');
-                    setupClientSession();
-                } else {
-                    // We are the Host
-                    isHost = true;
-                    // Generate a short readable session ID
-                    sessionId = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    activeConnection.on('error', (err) => {
+                        document.getElementById('client-status').innerText = "Connection failed. Please check the link.";
+                        document.getElementById('client-status').classList.replace('text-green-400', 'text-red-400');
+                    });
+                });
+                
+            } else {
+                // --- WE ARE THE HOST (Player 1) ---
+                isHost = true;
+                
+                peerInstance.on('open', (id) => {
+                    loadingAuth.classList.add('hidden');
                     hostControls.classList.remove('hidden');
                     
-                    const inviteUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
+                    const inviteUrl = `${window.location.origin}${window.location.pathname}?session=${id}`;
                     inviteLinkInput.value = inviteUrl;
                     
                     document.getElementById('copy-btn').addEventListener('click', () => {
@@ -311,101 +307,65 @@
                             document.execCommand('copy');
                         });
                     });
+                    
+                    animate(); // Start rendering background loop
+                });
 
-                    setupHostSession();
-                }
-            } catch (error) {
-                console.error("Auth error:", error);
-                loadingAuth.innerText = "Connection error. Please refresh.";
+                // Listen for client joining
+                peerInstance.on('connection', (conn) => {
+                    activeConnection = conn;
+                    
+                    activeConnection.on('open', () => {
+                        hostStatus.innerText = "Player 2 joined! Ready to bake.";
+                        hostStatus.classList.remove('animate-pulse');
+                        hostStatus.classList.replace('text-yellow-400', 'text-green-400');
+                        startBtn.classList.remove('hidden');
+                        setupHostListeners();
+                    });
+                });
             }
         }
 
-        async function setupHostSession() {
-            if (!userId) return;
-            // RULE 1: STRICT PATHS
-            sessionRef = doc(db, 'artifacts', appId, 'public', 'data', 'kitchenSessions', sessionId);
-            
-            // Initialize Game State in DB
-            await setDoc(sessionRef, {
-                gameState: gameState,
-                clientJoined: false,
-                p2Input: { left: false, right: false, up: false }
-            });
-
-            // Listen for client joining and input
-            onSnapshot(sessionRef, (docSnap) => {
-                if (!docSnap.exists()) return;
-                const data = docSnap.data();
-                
-                if (data.clientJoined && gameState.phase === 0) {
-                    hostStatus.innerText = "Player 2 joined! Ready to bake.";
-                    hostStatus.classList.remove('animate-pulse');
-                    hostStatus.classList.replace('text-yellow-400', 'text-green-400');
-                    startBtn.classList.remove('hidden');
+        function setupHostListeners() {
+            // Host listens for Player 2's inputs
+            activeConnection.on('data', (payload) => {
+                if (payload.type === 'INPUT') {
+                    p2RemoteInput = payload.data;
                 }
-
-                // Constantly update remote P2 input
-                if (data.p2Input) {
-                    p2RemoteInput = data.p2Input;
-                }
-            }, (error) => console.error("Host Snapshot error:", error));
-
-            startBtn.addEventListener('click', () => {
-                startGameAsHost();
             });
-            
-            // Start local rendering loop immediately for background
-            animate();
         }
 
-        async function setupClientSession() {
-            if (!userId) return;
-            sessionRef = doc(db, 'artifacts', appId, 'public', 'data', 'kitchenSessions', sessionId);
-            
-            // Mark as joined
-            await setDoc(sessionRef, { clientJoined: true }, { merge: true });
-
-            // Listen to Host's authoritative game state
-            onSnapshot(sessionRef, (docSnap) => {
-                if (!docSnap.exists()) return;
-                const data = docSnap.data();
-                
-                if (data.gameState) {
+        function setupClientListeners() {
+            // Client listens for Game State updates and Start Events
+            activeConnection.on('data', (payload) => {
+                if (payload.type === 'STATE') {
                     const prevPhase = gameState.phase;
-                    gameState = data.gameState; // Overwrite local state with Host state
+                    gameState = payload.data; // Overwrite local state with Host state
                     
-                    if (prevPhase === 0 && gameState.phase > 0) {
-                        // Game started by host
-                        showControlsScreen();
-                    } else if (prevPhase !== gameState.phase && gameState.phase > 0) {
+                    if (prevPhase !== gameState.phase && gameState.phase > 0) {
                         showPhaseAnnouncement(gameState.phase);
                     } else if (gameState.phase === 4 && prevPhase !== 4) {
                         showResultsScreen();
                     }
+                } else if (payload.type === 'START') {
+                    showControlsScreen();
                 }
-            }, (error) => console.error("Client Snapshot error:", error));
-
-            // Start client loop for input sending and rendering
-            animate();
+            });
         }
 
-        // Send Host State to Cloud
-        async function syncHostStateToCloud() {
-            if (!isHost || !userId || !sessionRef) return;
+        function syncHostStateToPeer() {
+            if (!isHost || !activeConnection || !activeConnection.open) return;
             
             const now = Date.now();
             if (now - lastSyncTime >= SYNC_RATE_MS) {
                 lastSyncTime = now;
-                try {
-                    await setDoc(sessionRef, { gameState: gameState }, { merge: true });
-                } catch(e) { console.error("Sync error:", e); }
+                activeConnection.send({ type: 'STATE', data: gameState });
             }
         }
 
-        // Send Client Input to Cloud
         let lastClientInputStr = "";
-        async function syncClientInputToCloud() {
-            if (isHost || !userId || !sessionRef) return;
+        function syncClientInputToPeer() {
+            if (isHost || !activeConnection || !activeConnection.open) return;
             
             // Map client's actual keyboard to logical P2 inputs
             const currentInput = {
@@ -417,20 +377,27 @@
             const inputStr = JSON.stringify(currentInput);
             if (inputStr !== lastClientInputStr) {
                 lastClientInputStr = inputStr;
-                try {
-                    await setDoc(sessionRef, { p2Input: currentInput }, { merge: true });
-                } catch(e) { console.error("Input sync error:", e); }
+                activeConnection.send({ type: 'INPUT', data: currentInput });
             }
         }
 
+        startBtn.addEventListener('click', () => {
+            startGameAsHost();
+        });
+
         function startGameAsHost() {
+            // Tell client to start
+            if (activeConnection && activeConnection.open) {
+                activeConnection.send({ type: 'START' });
+            }
+
             lobbyScreen.classList.add('hidden');
             showControlsScreen();
             
             setTimeout(() => {
                 gameState.phase = 1;
                 gameState.timer = 20;
-                syncHostStateToCloud();
+                syncHostStateToPeer();
                 showPhaseAnnouncement(1);
             }, 3000); // Wait on controls screen
         }
@@ -893,13 +860,13 @@
 
             if (gameState.phase > 0 && gameState.phase < 4) {
                 
-                // HOST: Run Physics & Sync to DB
+                // HOST: Run Physics & Sync to Peer
                 if (isHost) {
                     runHostLogic(dt);
-                    syncHostStateToCloud();
+                    syncHostStateToPeer();
                 } else {
-                    // CLIENT: Sync input to DB
-                    syncClientInputToCloud();
+                    // CLIENT: Sync input to Peer
+                    syncClientInputToPeer();
                 }
 
                 // BOTH: Render based on unified `gameState` object
@@ -925,7 +892,7 @@
             animationFrameId = requestAnimationFrame(animate);
         }
 
-        // Initialize Firebase when page loads
+        // Initialize PeerJS when page loads
         window.addEventListener('load', initMultiplayer);
 
     </script>
