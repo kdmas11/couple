@@ -2,111 +2,837 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minimal PeerJS Tester</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cozy Kitchen - Couples Online & Couch Compatibility Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Fredoka+One&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .panel { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background: radial-gradient(circle at center, #fff6f4 0%, #ffe9e3 100%);
+            touch-action: manipulation;
+        }
+        .bubbly-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        /* Custom scrollbar to keep layout neat */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #fff0ec;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ffb4a2;
+            border-radius: 4px;
+        }
     </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col items-center justify-between p-4 overflow-x-hidden">
 
-    <h2>PeerJS Connection Tester</h2>
-    <div id="status">Status: Disconnected</div>
+<div class="w-full max-w-4xl bg-white/80 backdrop-blur-md shadow-xl rounded-3xl p-6 border-4 border-orange-100 flex-grow flex flex-col justify-between">
+    
+    <header class="text-center mb-4">
+        <h1 class="text-3xl md:text-5xl bubbly-font text-pink-500 drop-shadow-sm flex items-center justify-center gap-2">
+            <span>🧁</span> Cozy Kitchen <span>🧁</span>
+        </h1>
+        <p class="text-sm md:text-base text-gray-600 mt-1">A co-op baking challenge designed to test & enhance relationship compatibility!</p>
+    </header>
 
-    <hr>
+    <main class="flex-grow flex flex-col items-center justify-center">
 
-    <div class="panel">
-        <h3>1. Host a Connection</h3>
-        <button onclick="hostRoom()">Generate Room Code</button>
-        <p>Your Room Code: <strong id="room-code">...</strong></p>
-    </div>
-
-    <div class="panel">
-        <h3>2. Join a Connection</h3>
-        <input type="text" id="join-code" placeholder="Enter Host's Room Code">
-        <button onclick="joinRoom()">Join Room</button>
-    </div>
-
-    <div class="panel" id="messaging" style="display: none;">
-        <h3>3. Send Data</h3>
-        <button onclick="sendHello()">Send "Hello" to Partner</button>
-        <p>Latest Message Received: <strong id="received-message">None</strong></p>
-    </div>
-
-    <script>
-        let peerInstance = null;
-        let activeConnection = null;
-        let isHost = false;
-
-        // --- HOST LOGIC ---
-        function hostRoom() {
-            document.getElementById("status").innerText = "Status: Initializing Host...";
+        <div id="setup-screen" class="w-full max-w-2xl space-y-6">
             
-            peerInstance = new Peer(); // Auto-generates a unique ID
-            
-            peerInstance.on("open", (id) => {
-                isHost = true;
-                document.getElementById("room-code").innerText = id;
-                document.getElementById("status").innerText = "Status: Waiting for partner...";
-            });
+            <div class="flex justify-center bg-pink-100/50 p-1.5 rounded-full border border-pink-200">
+                <button id="btn-mode-local" onclick="selectPlayMode('local')" class="w-1/2 py-2 text-sm font-bold rounded-full transition-all bg-white text-pink-600 shadow-sm">
+                    🖥️ Couch Co-Op (Local)
+                </button>
+                <button id="btn-mode-online" onclick="selectPlayMode('online')" class="w-1/2 py-2 text-sm font-bold rounded-full transition-all text-gray-500 hover:text-pink-500">
+                    🌐 Play Online (Real-time P2P)
+                </button>
+            </div>
 
-            // Listen for incoming connections from a client
-            peerInstance.on("connection", (conn) => {
-                activeConnection = conn;
-                setupDataListener();
-            });
+            <div id="online-lobby-panel" class="hidden bg-pink-50/50 p-5 rounded-2xl border border-pink-100 space-y-4">
+                <h3 class="font-bold text-pink-800 text-sm uppercase tracking-wider text-center">WebRTC Connection Station</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-pink-100 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h4 class="font-bold text-gray-700 text-sm">Option A: Host a Room</h4>
+                            <p class="text-xs text-gray-500">Start a lobby and share your connection key with your partner.</p>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <button id="btn-host-room" onclick="hostRoom()" class="text-xs font-bold bg-pink-400 hover:bg-pink-500 text-white py-2 px-4 rounded-lg transition-transform active:scale-95">
+                                🏠 Generate Room Code
+                            </button>
+                            <div id="host-code-display" class="hidden flex items-center justify-between bg-pink-50 p-2 rounded border border-pink-100 text-xs">
+                                <span class="font-mono font-bold text-pink-700" id="txt-room-code">WAITING...</span>
+                                <button onclick="copyRoomCode()" class="text-pink-500 hover:text-pink-700 font-bold px-1.5">Copy 📋</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-pink-100 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h4 class="font-bold text-gray-700 text-sm">Option B: Join a Friend</h4>
+                            <p class="text-xs text-gray-500">Paste the connection key received from your hosting partner.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="ipt-room-code" placeholder="Enter Room Code" class="flex-grow text-center text-xs font-mono font-bold border border-gray-300 rounded-lg p-2 focus:outline-pink-400">
+                            <button onclick="joinRoom()" class="text-xs font-bold bg-teal-500 hover:bg-teal-600 text-white py-2 px-4 rounded-lg transition-transform active:scale-95">
+                                🤝 Join Room
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="connection-status-pill" class="text-center text-xs font-bold py-1 bg-gray-100 rounded-lg text-gray-500">
+                    Offline Status: Ready to play locally or connect online.
+                </div>
+            </div>
+
+            <div class="bg-amber-50/50 p-5 rounded-2xl border border-amber-100 text-center">
+                <h2 class="text-xl font-bold text-amber-800 mb-1">Configure Your Avatars!</h2>
+                <p id="setup-instruction-txt" class="text-gray-600 text-xs md:text-sm">
+                    Grab your partner, sit close, and get ready to cook. Customize your names and avatars to proceed.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div id="card-p1" class="bg-rose-50/50 p-6 rounded-2xl border-2 border-rose-100 flex flex-col items-center space-y-4">
+                    <span class="text-xs font-bold uppercase tracking-wider text-rose-500 bg-rose-100 px-3 py-1 rounded-full">Partner 1 (Left Side)</span>
+                    <input type="text" id="p1-name" oninput="syncLobbyValues()" value="Baker Joy" class="w-full text-center font-semibold bg-white border border-rose-200 rounded-xl px-3 py-2 text-gray-700 focus:outline-rose-400">
+                    
+                    <div class="flex items-center space-x-4">
+                        <button id="p1-carousel-prev" onclick="changeAvatar(1, -1)" class="w-10 h-10 bg-white border-2 border-rose-200 hover:bg-rose-100 rounded-full text-xl flex items-center justify-center transition-transform active:scale-95">◀</button>
+                        <div id="p1-avatar-preview" class="text-6xl select-none filter drop-shadow-md">👩‍🍳</div>
+                        <button id="p1-carousel-next" onclick="changeAvatar(1, 1)" class="w-10 h-10 bg-white border-2 border-rose-200 hover:bg-rose-100 rounded-full text-xl flex items-center justify-center transition-transform active:scale-95">▶</button>
+                    </div>
+                    <p class="text-xs text-gray-500 text-center">Controls: <kbd class="bg-gray-200 px-1 rounded">A</kbd> & <kbd class="bg-gray-200 px-1 rounded">D</kbd> keys or left-side screen controls</p>
+                </div>
+
+                <div id="card-p2" class="bg-teal-50/50 p-6 rounded-2xl border-2 border-teal-100 flex flex-col items-center space-y-4">
+                    <span class="text-xs font-bold uppercase tracking-wider text-teal-600 bg-teal-100 px-3 py-1 rounded-full">Partner 2 (Right Side)</span>
+                    <input type="text" id="p2-name" oninput="syncLobbyValues()" value="Baker Sweet" class="w-full text-center font-semibold bg-white border border-teal-200 rounded-xl px-3 py-2 text-gray-700 focus:outline-teal-400">
+                    
+                    <div class="flex items-center space-x-4">
+                        <button id="p2-carousel-prev" onclick="changeAvatar(2, -1)" class="w-10 h-10 bg-white border-2 border-teal-200 hover:bg-teal-100 rounded-full text-xl flex items-center justify-center transition-transform active:scale-95">◀</button>
+                        <div id="p2-avatar-preview" class="text-6xl select-none filter drop-shadow-md">👨‍🍳</div>
+                        <button id="p2-carousel-next" onclick="changeAvatar(2, 1)" class="w-10 h-10 bg-white border-2 border-teal-200 hover:bg-teal-100 rounded-full text-xl flex items-center justify-center transition-transform active:scale-95">▶</button>
+                    </div>
+                    <p class="text-xs text-gray-500 text-center">Controls: <kbd class="bg-gray-200 px-1 rounded">◀</kbd> & <kbd class="bg-gray-200 px-1 rounded">▶</kbd> arrow keys or right-side screen controls</p>
+                </div>
+            </div>
+
+            <div class="text-center pt-4">
+                <button id="btn-launch" onclick="launchGame()" class="bubbly-font bg-pink-500 hover:bg-pink-600 active:scale-95 text-white text-2xl py-4 px-12 rounded-full shadow-lg transition-transform hover:shadow-pink-300/50 hover:shadow-xl">
+                    Enter Kitchen! 🍕
+                </button>
+            </div>
+        </div>
+
+        <div id="game-screen" class="hidden w-full flex flex-col items-center space-y-4">
+            
+            <div class="w-full flex justify-between items-center bg-pink-50/60 border border-pink-100 p-3 rounded-2xl text-xs md:text-sm">
+                <div class="flex items-center gap-2">
+                    <span id="p1-badge" class="text-xl">👩‍🍳</span>
+                    <div>
+                        <p class="font-bold text-rose-700" id="p1-hud-name">Partner 1</p>
+                        <p class="text-gray-500" id="p1-controller-desc">Left Controller</p>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    <span id="game-phase-indicator" class="font-bold text-pink-600 bg-white border border-pink-200 px-4 py-1.5 rounded-full shadow-sm text-sm">
+                        Phase 1: Catch Ingredients
+                    </span>
+                    <p class="text-gray-400 text-[10px] mt-1">Work Together to fill the score bar!</p>
+                </div>
+
+                <div class="flex items-center gap-2 text-right">
+                    <div>
+                        <p class="font-bold text-teal-700" id="p2-hud-name">Partner 2</p>
+                        <p class="text-gray-500" id="p2-controller-desc">Right Controller</p>
+                    </div>
+                    <span id="p2-badge" class="text-xl">👨‍🍳</span>
+                </div>
+            </div>
+
+            <div class="relative w-full max-w-3xl aspect-[16/9] bg-slate-900 rounded-2xl overflow-hidden border-4 border-amber-900/10 shadow-inner">
+                <canvas id="cookingCanvas" class="w-full h-full block bg-gradient-to-b from-orange-50 to-orange-100"></canvas>
+                
+                <div id="canvas-overlay" class="absolute inset-0 bg-black/65 flex flex-col items-center justify-center text-center p-6 transition-opacity duration-300">
+                    <h3 id="overlay-title" class="bubbly-font text-white text-2xl md:text-4xl mb-2 text-pink-400">Get Ready!</h3>
+                    <p id="overlay-desc" class="text-white/90 max-w-md text-sm md:text-base mb-6">Instruction text goes here...</p>
+                    <button id="overlay-btn" onclick="startCurrentPhase()" class="bubbly-font bg-pink-500 hover:bg-pink-600 text-white text-lg py-3 px-8 rounded-full transition-all active:scale-95 shadow-lg">
+                        We are ready! Let's go
+                    </button>
+                </div>
+            </div>
+
+            <div class="w-full grid grid-cols-2 gap-4 pt-2">
+                <div id="ctrl-p1-panel" class="flex justify-around items-center bg-rose-50/50 p-3 rounded-2xl border border-rose-100 select-none">
+                    <button id="btn-p1-left" class="w-14 h-14 bg-white active:bg-rose-200 rounded-2xl border-2 border-rose-200 shadow-md flex items-center justify-center text-2xl transition-transform active:scale-90 text-rose-600">◀</button>
+                    <div class="text-center">
+                        <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider block">P1 Action</span>
+                        <button id="btn-p1-action" class="mt-1 w-16 h-12 bg-rose-400 active:bg-rose-600 text-white font-bold rounded-full shadow-md text-xs uppercase flex items-center justify-center transition-all active:scale-95">STIR</button>
+                    </div>
+                    <button id="btn-p1-right" class="w-14 h-14 bg-white active:bg-rose-200 rounded-2xl border-2 border-rose-200 shadow-md flex items-center justify-center text-2xl transition-transform active:scale-90 text-rose-600">▶</button>
+                </div>
+
+                <div id="ctrl-p2-panel" class="flex justify-around items-center bg-teal-50/50 p-3 rounded-2xl border border-teal-100 select-none">
+                    <button id="btn-p2-left" class="w-14 h-14 bg-white active:bg-teal-200 rounded-2xl border-2 border-teal-200 shadow-md flex items-center justify-center text-2xl transition-transform active:scale-90 text-teal-600">◀</button>
+                    <div class="text-center">
+                        <span class="text-[10px] font-bold text-teal-400 uppercase tracking-wider block">P2 Action</span>
+                        <button id="btn-p2-action" class="mt-1 w-16 h-12 bg-teal-400 active:bg-teal-600 text-white font-bold rounded-full shadow-md text-xs uppercase flex items-center justify-center transition-all active:scale-95">STIR</button>
+                    </div>
+                    <button id="btn-p2-right" class="w-14 h-14 bg-white active:bg-teal-200 rounded-2xl border-2 border-teal-200 shadow-md flex items-center justify-center text-2xl transition-transform active:scale-90 text-teal-600">▶</button>
+                </div>
+            </div>
+
+            <div class="text-center text-xs text-gray-400">
+                Tip: Share screen and enjoy! Communicate verbally to coordinate timing.
+            </div>
+        </div>
+
+        <div id="results-screen" class="hidden w-full max-w-2xl space-y-6">
+            <div class="text-center">
+                <span class="text-6xl">🎂💖🎉</span>
+                <h2 class="text-3xl md:text-4xl bubbly-font text-pink-500 mt-3">The Cake is Baked!</h2>
+                <p class="text-gray-500 text-sm md:text-base mt-1">Here is a report of how you performed as co-bakers and partners.</p>
+            </div>
+
+            <div class="bg-pink-50/30 p-6 rounded-3xl border-2 border-pink-100 space-y-6">
+                <div class="flex flex-col md:flex-row items-center justify-around gap-6">
+                    <div class="relative w-36 h-36 flex items-center justify-center bg-white rounded-full shadow-lg border-4 border-pink-200">
+                        <div class="text-center">
+                            <span id="score-percentage" class="bubbly-font text-4xl text-pink-500">85%</span>
+                            <span class="text-[10px] block font-bold text-gray-400 uppercase tracking-wide">Synergy Match</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-grow space-y-3 max-w-sm">
+                        <h4 class="font-bold text-lg text-rose-800">Your Co-Op Relationship Archetype:</h4>
+                        <p id="archetype-title" class="font-semibold text-pink-600">Perfect Rhythm Partners</p>
+                        <p id="archetype-desc" class="text-xs text-gray-600 leading-relaxed">
+                            You work incredibly well in structured coordination. You understand when to hold back and when to lean in, making you strong collaborators.
+                        </p>
+                    </div>
+                </div>
+
+                <hr class="border-pink-100">
+
+                <div class="space-y-3">
+                    <h4 class="font-bold text-sm text-pink-800 uppercase tracking-widest">Pillar Breakdown</h4>
+                    
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs font-semibold text-gray-600">
+                            <span>🤝 Ingredient Gathering (Teamwork)</span>
+                            <span id="stat-gathering">80%</span>
+                        </div>
+                        <div class="h-2 w-full bg-pink-100 rounded-full overflow-hidden">
+                            <div id="bar-gathering" class="h-full bg-pink-400 transition-all duration-1000" style="width: 80%"></div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs font-semibold text-gray-600">
+                            <span>💓 Whip Whisking (Synchronization)</span>
+                            <span id="stat-sync">90%</span>
+                        </div>
+                        <div class="h-2 w-full bg-pink-100 rounded-full overflow-hidden">
+                            <div id="bar-sync" class="h-full bg-pink-400 transition-all duration-1000" style="width: 90%"></div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs font-semibold text-gray-600">
+                            <span>⚖️ Temperature Control (Balance)</span>
+                            <span id="stat-balance">85%</span>
+                        </div>
+                        <div class="h-2 w-full bg-pink-100 rounded-full overflow-hidden">
+                            <div id="bar-balance" class="h-full bg-pink-400 transition-all duration-1000" style="width: 85%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-pink-100">
+
+                <div class="bg-white/80 p-5 rounded-2xl border border-pink-100/50 space-y-3">
+                    <h4 class="font-bold text-sm text-pink-800 flex items-center gap-1">
+                        💬 Conversational Spark Prompts
+                    </h4>
+                    <p class="text-xs text-gray-500">Take a moment to discuss these short questions together on the couch:</p>
+                    <ul class="text-xs text-gray-700 list-disc list-inside space-y-2">
+                        <li>Who naturally took the lead in balancing the oven, and how does that match real-world household decisions?</li>
+                        <li>Was catching ingredients easy to communicate, or did you accidentally crowd each other's spaces?</li>
+                        <li>How can we bring this dynamic of 'rhythm and sync' to our daily routines?</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button onclick="resetSetup()" class="bubbly-font bg-pink-500 hover:bg-pink-600 active:scale-95 text-white py-3 px-8 rounded-full shadow-md transition-all">
+                    Bake Another Recipe 🍳
+                </button>
+                <button onclick="shareResults()" class="bubbly-font bg-teal-500 hover:bg-teal-600 active:scale-95 text-white py-3 px-8 rounded-full shadow-md transition-all">
+                    Copy Results to Clipboard 📋
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="text-center text-xs text-gray-400 border-t border-gray-100 pt-4 mt-4">
+        Made with ❤️ for gaming couples. Remember, a burnt cake is just an excuse to bake another!
+    </footer>
+</div>
+
+<script>
+    const AVATARS = [
+        "👩‍🍳", "👨‍🍳", "🧑‍🍳", "🐱‍🍳", "🐼", "🦊", "🐰", "🐨", "🦁"
+    ];
+
+    let player1Index = 0;
+    let player2Index = 1;
+
+    let p1Name = "Baker Joy";
+    let p2Name = "Baker Sweet";
+
+    // Play Mode Core Configuration
+    let playMode = "local"; // 'local' or 'online'
+    let isHost = false;
+    let isConnected = false;
+    let peerInstance = null;
+    let activeConnection = null;
+
+    // Game Core State
+    let canvas = document.getElementById("cookingCanvas");
+    let ctx = canvas.getContext("2d");
+
+    let animationFrameId;
+    let gamePhase = 1; // 1: Gathering, 2: Whipping, 3: Balancing, 4: Finished
+    let phaseActive = false;
+
+    // Couple statistics we will accumulate to measure compatibility
+    let stats = {
+        gatheringScore: 0,
+        gatheringMisses: 0,
+        whippingPerfectSyncs: 0,
+        whippingAttempts: 0,
+        balancePerfectSecs: 0,
+        balanceTotalSecs: 0,
+        totalErrors: 0
+    };
+
+    // Shared game state logic
+    let gameState = {
+        p1: { x: 0.3 }, // % of canvas
+        p2: { x: 0.7 },
+        items: [], // falling items
+        whiskL: false, whiskR: false, whiskAmt: 0,
+        heat: 50,
+        timer: 0
+    };
+
+    // Keyboard Tracking
+    const keys = {};
+    window.addEventListener("keydown", (e) => {
+        keys[e.key.toLowerCase()] = true;
+        if (playMode === "online" && !isHost && activeConnection) {
+            sendClientInputs();
+        }
+        if (["arrowleft", "arrowright", "arrowup", "arrowdown", " "].includes(e.key.toLowerCase())) {
+            e.preventDefault();
+        }
+    });
+    window.addEventListener("keyup", (e) => {
+        keys[e.key.toLowerCase()] = false;
+        if (playMode === "online" && !isHost && activeConnection) {
+            sendClientInputs();
+        }
+    });
+
+    // Touch Button Tracking
+    const touchStates = {
+        p1Left: false, p1Right: false,
+        p2Left: false, p2Right: false,
+        p1Action: false, p2Action: false
+    };
+
+    function bindTouchBtn(elementId, stateProp) {
+        const btn = document.getElementById(elementId);
+        if (!btn) return;
+
+        const setPressed = (val) => {
+            touchStates[stateProp] = val;
+            if (playMode === "online" && !isHost && activeConnection) {
+                sendClientInputs();
+            }
+        };
+
+        btn.addEventListener("touchstart", (e) => { e.preventDefault(); setPressed(true); });
+        btn.addEventListener("touchend", (e) => { e.preventDefault(); setPressed(false); });
+        btn.addEventListener("mousedown", () => setPressed(true));
+        btn.addEventListener("mouseup", () => setPressed(false));
+        btn.addEventListener("mouseleave", () => setPressed(false));
+    }
+
+    bindTouchBtn("btn-p1-left", "p1Left");
+    bindTouchBtn("btn-p1-right", "p1Right");
+    bindTouchBtn("btn-p2-left", "p2Left");
+    bindTouchBtn("btn-p2-right", "p2Right");
+
+    // Single Taps for actions
+    document.getElementById("btn-p1-action").addEventListener("mousedown", () => handleActionTap(1));
+    document.getElementById("btn-p1-action").addEventListener("touchstart", (e) => { e.preventDefault(); handleActionTap(1); });
+    document.getElementById("btn-p2-action").addEventListener("mousedown", () => handleActionTap(2));
+    document.getElementById("btn-p2-action").addEventListener("touchstart", (e) => { e.preventDefault(); handleActionTap(2); });
+
+    function handleActionTap(playerNum) {
+        if (playMode === "online" && !isHost) {
+            if (activeConnection) {
+                activeConnection.send({ type: "CLIENT_TAP", player: playerNum });
+            }
+            return;
         }
 
-        // --- JOIN LOGIC ---
-        function joinRoom() {
-            const joinId = document.getElementById("join-code").value.trim();
-            if (!joinId) return alert("Enter a code!");
+        if (!phaseActive) return;
+        if (gamePhase === 2) {
+            handleWhipPress(playerNum);
+        } else if (gamePhase === 3) {
+            handleOvenPress(playerNum);
+        }
+    }
 
-            document.getElementById("status").innerText = "Status: Connecting...";
-            peerInstance = new Peer();
+    function selectPlayMode(mode) {
+        playMode = mode;
+        const btnLocal = document.getElementById("btn-mode-local");
+        const btnOnline = document.getElementById("btn-mode-online");
+        const onlinePanel = document.getElementById("online-lobby-panel");
 
-            peerInstance.on("open", () => {
-                isHost = false;
-                // Connect to the Host's ID
-                activeConnection = peerInstance.connect(joinId);
-                
-                // Wait for the connection to fully open before setting up the listener
-                activeConnection.on("open", () => {
-                    setupDataListener();
-                });
+        if (mode === "local") {
+            btnLocal.className = "w-1/2 py-2 text-sm font-bold rounded-full transition-all bg-white text-pink-600 shadow-sm";
+            btnOnline.className = "w-1/2 py-2 text-sm font-bold rounded-full transition-all text-gray-500 hover:text-pink-500";
+            onlinePanel.classList.add("hidden");
+            enableControls(true, true);
+            document.getElementById("setup-instruction-txt").innerText = "Grab your partner, sit close, and get ready to cook. Customize names & avatars below.";
+        } else {
+            btnOnline.className = "w-1/2 py-2 text-sm font-bold rounded-full transition-all bg-white text-pink-600 shadow-sm";
+            btnLocal.className = "w-1/2 py-2 text-sm font-bold rounded-full transition-all text-gray-500 hover:text-pink-500";
+            onlinePanel.classList.remove("hidden");
+            document.getElementById("setup-instruction-txt").innerText = "One player hosts, while the other joins via Room Code. Host moves as Partner 1; Joiner moves as Partner 2.";
+        }
+    }
+
+    function enableControls(p1Enabled, p2Enabled) {
+        document.getElementById("p1-name").disabled = !p1Enabled;
+        document.getElementById("p2-name").disabled = !p2Enabled;
+        document.getElementById("p1-carousel-prev").disabled = !p1Enabled;
+        document.getElementById("p1-carousel-next").disabled = !p1Enabled;
+        document.getElementById("p2-carousel-prev").disabled = !p2Enabled;
+        document.getElementById("p2-carousel-next").disabled = !p2Enabled;
+    }
+
+    function changeAvatar(player, dir) {
+        if (player === 1) {
+            player1Index = (player1Index + dir + AVATARS.length) % AVATARS.length;
+            document.getElementById("p1-avatar-preview").innerText = AVATARS[player1Index];
+        } else {
+            player2Index = (player2Index + dir + AVATARS.length) % AVATARS.length;
+            document.getElementById("p2-avatar-preview").innerText = AVATARS[player2Index];
+        }
+        syncLobbyValues();
+    }
+
+    function syncLobbyValues() {
+        p1Name = document.getElementById("p1-name").value;
+        p2Name = document.getElementById("p2-name").value;
+        if (playMode === "online" && activeConnection) {
+            activeConnection.send({
+                type: "LOBBY_SYNC",
+                p1Name, p1Index: player1Index,
+                p2Name, p2Index: player2Index
             });
         }
+    }
 
-        // --- DATA HANDLING ---
-        function setupDataListener() {
-            document.getElementById("status").innerText = "Status: Connected successfully!";
-            document.getElementById("messaging").style.display = "block";
+    function copyRoomCode() {
+        const code = document.getElementById("txt-room-code").innerText;
+        navigator.clipboard.writeText(code);
+        alert("Room Code Copied!");
+    }
 
-            // Listen for data coming from the other person
-            activeConnection.on("data", (data) => {
-                console.log("Received data:", data);
-                
-                if (data.type === "GREETING") {
-                    document.getElementById("received-message").innerText = data.text;
+    function hostRoom() {
+        document.getElementById("connection-status-pill").innerText = "Initializing Peer Engine...";
+        document.getElementById("connection-status-pill").className = "text-center text-xs font-bold py-1 bg-amber-100 rounded-lg text-amber-600";
+
+        peerInstance = new Peer();
+        
+        peerInstance.on("open", (id) => {
+            isHost = true;
+            document.getElementById("txt-room-code").innerText = id;
+            document.getElementById("host-code-display").classList.remove("hidden");
+            document.getElementById("connection-status-pill").innerText = "Room Created! Share Room Code. Waiting for Partner...";
+            enableControls(true, false);
+        });
+
+        peerInstance.on("connection", (conn) => {
+            activeConnection = conn;
+            setupActiveConnection();
+        });
+
+        peerInstance.on("error", (err) => {
+            document.getElementById("connection-status-pill").innerText = "P2P Error: " + err.message;
+            document.getElementById("connection-status-pill").className = "text-center text-xs font-bold py-1 bg-rose-100 rounded-lg text-rose-600";
+        });
+    }
+
+    function joinRoom() {
+        const joinId = document.getElementById("ipt-room-code").value.trim();
+        if (!joinId) return alert("Please enter a valid Host Room Code.");
+
+        document.getElementById("connection-status-pill").innerText = "Connecting to Host Room...";
+        document.getElementById("connection-status-pill").className = "text-center text-xs font-bold py-1 bg-amber-100 rounded-lg text-amber-600";
+
+        peerInstance = new Peer();
+
+        peerInstance.on("open", (id) => {
+            isHost = false;
+            activeConnection = peerInstance.connect(joinId);
+            setupActiveConnection();
+        });
+
+        peerInstance.on("error", (err) => {
+            document.getElementById("connection-status-pill").innerText = "Join Connection Failed. Verify Code.";
+            document.getElementById("connection-status-pill").className = "text-center text-xs font-bold py-1 bg-rose-100 rounded-lg text-rose-600";
+        });
+    }
+
+    function setupActiveConnection() {
+        isConnected = true;
+        document.getElementById("connection-status-pill").innerText = "Connected Successfully! Ready to Bake.";
+        document.getElementById("connection-status-pill").className = "text-center text-xs font-bold py-1 bg-emerald-100 rounded-lg text-emerald-700";
+
+        if (!isHost) enableControls(false, true);
+        syncLobbyValues();
+
+        activeConnection.on("data", (data) => {
+            if (data.type === "LOBBY_SYNC") {
+                if (isHost) {
+                    p2Name = data.p2Name; player2Index = data.p2Index;
+                    document.getElementById("p2-name").value = p2Name;
+                    document.getElementById("p2-avatar-preview").innerText = AVATARS[player2Index];
+                } else {
+                    p1Name = data.p1Name; player1Index = data.p1Index;
+                    document.getElementById("p1-name").value = p1Name;
+                    document.getElementById("p1-avatar-preview").innerText = AVATARS[player1Index];
                 }
+            } else if (data.type === "CLIENT_INPUT") {
+                if (isHost) {
+                    touchStates.p2Left = data.touch.p2Left;
+                    touchStates.p2Right = data.touch.p2Right;
+                    keys["arrowleft"] = data.keys.arrowleft;
+                    keys["arrowright"] = data.keys.arrowright;
+                }
+            } else if (data.type === "CLIENT_TAP" && isHost) {
+                handleActionTap(data.player);
+            } else if (data.type === "GAME_START" && !isHost) {
+                launchGameLocal();
+            } else if (data.type === "PHASE_START" && !isHost) {
+                startPhaseLocal(data.phase);
+            } else if (data.type === "HOST_STATE_SYNC" && !isHost) {
+                gameState = data.state;
+                stats = data.stats;
+                gamePhase = data.phase;
+                phaseActive = data.phaseActive;
+            } else if (data.type === "GAME_OVER" && !isHost) {
+                stats = data.stats;
+                showResults();
+            }
+        });
+    }
+
+    function sendClientInputs() {
+        if (playMode === "online" && !isHost && activeConnection) {
+            activeConnection.send({
+                type: "CLIENT_INPUT",
+                touch: { p2Left: touchStates.p2Left, p2Right: touchStates.p2Right },
+                keys: { arrowleft: keys["arrowleft"], arrowright: keys["arrowright"] }
             });
         }
+    }
 
-        // --- SENDING DATA ---
-        function sendHello() {
-            if (activeConnection && activeConnection.open) {
-                const message = isHost ? "Hello from the Host!" : "Hello from the Client!";
-                
-                // Send a JSON object over WebRTC
-                activeConnection.send({
-                    type: "GREETING",
-                    text: message
+    // Launch & Canvas Initialization
+    function launchGame() {
+        if (playMode === "online" && !isHost) return alert("Waiting for Host to start the game...");
+        if (playMode === "online" && isHost && activeConnection) {
+            activeConnection.send({ type: "GAME_START" });
+        }
+        launchGameLocal();
+    }
+
+    function launchGameLocal() {
+        document.getElementById("setup-screen").classList.add("hidden");
+        document.getElementById("game-screen").classList.remove("hidden");
+        
+        document.getElementById("p1-badge").innerText = AVATARS[player1Index];
+        document.getElementById("p1-hud-name").innerText = p1Name;
+        document.getElementById("p2-badge").innerText = AVATARS[player2Index];
+        document.getElementById("p2-hud-name").innerText = p2Name;
+
+        resizeCanvas();
+        window.addEventListener("resize", resizeCanvas);
+        
+        if (playMode === "local" || isHost) {
+            gameLoop();
+        } else {
+            clientRenderLoop(); // For joined players, just render received host state
+        }
+        preparePhase(1);
+    }
+
+    function resizeCanvas() {
+        const container = canvas.parentElement;
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+    }
+
+    // --- GAME PHASES LOGIC ---
+
+    function preparePhase(phase) {
+        gamePhase = phase;
+        phaseActive = false;
+        let title = "", desc = "", p1Btn = "---", p2Btn = "---";
+
+        if (phase === 1) {
+            title = "Phase 1: Catch Ingredients!";
+            desc = "Move left/right to catch falling ingredients. Don't catch the trash! P1 uses A/D, P2 uses Arrows.";
+        } else if (phase === 2) {
+            title = "Phase 2: Sync Whisking!";
+            desc = "Tap 'WHISK' repeatedly! Keep your rhythms perfectly synchronized to fill the bowl.";
+            p1Btn = "WHISK"; p2Btn = "WHISK";
+        } else if (phase === 3) {
+            title = "Phase 3: Balance Heat!";
+            desc = "P1 cools the oven (COOL), P2 warms it (HEAT). Keep the dial in the green zone!";
+            p1Btn = "COOL"; p2Btn = "HEAT";
+        }
+
+        document.getElementById("overlay-title").innerText = title;
+        document.getElementById("overlay-desc").innerText = desc;
+        document.getElementById("game-phase-indicator").innerText = title;
+        document.getElementById("btn-p1-action").innerText = p1Btn;
+        document.getElementById("btn-p2-action").innerText = p2Btn;
+
+        if (playMode === "online" && !isHost) {
+            document.getElementById("overlay-btn").style.display = "none";
+            document.getElementById("overlay-desc").innerText += "\n(Waiting for Host...)";
+        } else {
+            document.getElementById("overlay-btn").style.display = "inline-block";
+        }
+        
+        document.getElementById("canvas-overlay").classList.remove("hidden");
+    }
+
+    function startCurrentPhase() {
+        if (playMode === "online" && isHost && activeConnection) {
+            activeConnection.send({ type: "PHASE_START", phase: gamePhase });
+        }
+        startPhaseLocal(gamePhase);
+    }
+
+    function startPhaseLocal(phase) {
+        document.getElementById("canvas-overlay").classList.add("hidden");
+        phaseActive = true;
+        if (phase === 1) { gameState.timer = 1500; gameState.items = []; }
+        if (phase === 2) { gameState.timer = 1000; gameState.whiskAmt = 0; }
+        if (phase === 3) { gameState.timer = 1000; gameState.heat = 50; }
+    }
+
+    // Phase Input Handlers
+    function handleWhipPress(pNum) {
+        if(pNum === 1) gameState.whiskL = true;
+        if(pNum === 2) gameState.whiskR = true;
+        stats.whippingAttempts++;
+        if (gameState.whiskL && gameState.whiskR) {
+            gameState.whiskAmt += 5;
+            stats.whippingPerfectSyncs++;
+            gameState.whiskL = false; gameState.whiskR = false;
+        }
+    }
+
+    function handleOvenPress(pNum) {
+        if(pNum === 1) gameState.heat -= 3;
+        if(pNum === 2) gameState.heat += 3;
+    }
+
+    // Loop for Host / Local
+    function gameLoop() {
+        if (phaseActive) {
+            // Player Movement
+            if (keys['a'] || touchStates.p1Left) gameState.p1.x = Math.max(0.05, gameState.p1.x - 0.01);
+            if (keys['d'] || touchStates.p1Right) gameState.p1.x = Math.min(0.45, gameState.p1.x + 0.01);
+            if (keys['arrowleft'] || touchStates.p2Left) gameState.p2.x = Math.max(0.55, gameState.p2.x - 0.01);
+            if (keys['arrowright'] || touchStates.p2Right) gameState.p2.x = Math.min(0.95, gameState.p2.x + 0.01);
+
+            gameState.timer--;
+
+            if (gamePhase === 1) {
+                // Spawn Items
+                if (Math.random() < 0.03) {
+                    gameState.items.push({ x: Math.random(), y: 0, bad: Math.random() < 0.3 });
+                }
+                // Update Items
+                gameState.items.forEach((item, i) => {
+                    item.y += 0.005;
+                    // Collision
+                    if (item.y > 0.8) {
+                        let hitP1 = Math.abs(item.x - gameState.p1.x) < 0.1;
+                        let hitP2 = Math.abs(item.x - gameState.p2.x) < 0.1;
+                        if (hitP1 || hitP2) {
+                            if (item.bad) stats.gatheringMisses++; else stats.gatheringScore++;
+                            gameState.items.splice(i, 1);
+                        }
+                    }
                 });
-            } else {
-                alert("Connection is not open yet.");
+                gameState.items = gameState.items.filter(i => i.y < 1);
+            } 
+            else if (gamePhase === 2) {
+                // Auto decay sync windows
+                if(Math.random() < 0.05) { gameState.whiskL = false; gameState.whiskR = false; }
+            } 
+            else if (gamePhase === 3) {
+                // Heat fluctuates randomly, aim for 40-60
+                gameState.heat += (Math.random() - 0.5) * 1.5;
+                if (gameState.heat >= 40 && gameState.heat <= 60) stats.balancePerfectSecs++;
+                stats.balanceTotalSecs++;
+            }
+
+            // End Phase Trigger
+            if (gameState.timer <= 0) {
+                phaseActive = false;
+                if (gamePhase === 1) preparePhase(2);
+                else if (gamePhase === 2) preparePhase(3);
+                else finishGame();
             }
         }
-    </script>
+
+        drawState();
+
+        if (playMode === "online" && isHost && activeConnection) {
+            activeConnection.send({
+                type: "HOST_STATE_SYNC",
+                state: gameState, stats: stats, phase: gamePhase, phaseActive: phaseActive
+            });
+        }
+        animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    // Loop for Client (Just renders what host sends)
+    function clientRenderLoop() {
+        drawState();
+        animationFrameId = requestAnimationFrame(clientRenderLoop);
+    }
+
+    // Rendering Physics to Canvas
+    function drawState() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const w = canvas.width;
+        const h = canvas.height;
+
+        // Draw Divider
+        ctx.fillStyle = "rgba(0,0,0,0.1)";
+        ctx.fillRect(w/2 - 2, 0, 4, h);
+
+        // Draw Players
+        ctx.font = `${Math.min(w*0.08, 60)}px Arial`;
+        ctx.textAlign = "center";
+        ctx.fillText(AVATARS[player1Index], gameState.p1.x * w, h * 0.9);
+        ctx.fillText(AVATARS[player2Index], gameState.p2.x * w, h * 0.9);
+
+        if (gamePhase === 1 && phaseActive) {
+            ctx.font = `${Math.min(w*0.05, 40)}px Arial`;
+            gameState.items.forEach(item => {
+                ctx.fillText(item.bad ? "🧦" : "🍓", item.x * w, item.y * h);
+            });
+        }
+        else if (gamePhase === 2 && phaseActive) {
+            // Draw Bowl & Whisk Bar
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(w*0.3, h*0.4, w*0.4, h*0.1);
+            ctx.fillStyle = "pink";
+            ctx.fillRect(w*0.3, h*0.4, (w*0.4) * Math.min(1, gameState.whiskAmt/100), h*0.1);
+            ctx.strokeRect(w*0.3, h*0.4, w*0.4, h*0.1);
+            ctx.fillStyle = "#000";
+            ctx.fillText("Bowl Mix Level", w/2, h*0.35);
+        }
+        else if (gamePhase === 3 && phaseActive) {
+            // Draw Heat Gauge
+            ctx.fillStyle = "red";
+            ctx.fillRect(w*0.2, h*0.4, w*0.6, h*0.1);
+            ctx.fillStyle = "green"; // Sweet spot
+            ctx.fillRect(w*0.4, h*0.4, w*0.2, h*0.1);
+            
+            // Pointer
+            ctx.fillStyle = "black";
+            let pointerX = w * 0.2 + (w * 0.6) * (Math.max(0, Math.min(100, gameState.heat)) / 100);
+            ctx.beginPath();
+            ctx.moveTo(pointerX, h*0.35);
+            ctx.lineTo(pointerX - 10, h*0.3);
+            ctx.lineTo(pointerX + 10, h*0.3);
+            ctx.fill();
+        }
+    }
+
+    // Finish & Results
+    function finishGame() {
+        cancelAnimationFrame(animationFrameId);
+        if (playMode === "online" && isHost && activeConnection) {
+            activeConnection.send({ type: "GAME_OVER", stats: stats });
+        }
+        showResults();
+    }
+
+    function showResults() {
+        document.getElementById("game-screen").classList.add("hidden");
+        document.getElementById("results-screen").classList.remove("hidden");
+
+        // Calculate Scores
+        let gatheringPct = stats.gatheringScore === 0 ? 0 : Math.round((stats.gatheringScore / (stats.gatheringScore + stats.gatheringMisses)) * 100);
+        let syncPct = stats.whippingAttempts === 0 ? 0 : Math.min(100, Math.round((stats.whippingPerfectSyncs / (stats.whippingAttempts/2)) * 100));
+        let balancePct = stats.balanceTotalSecs === 0 ? 0 : Math.round((stats.balancePerfectSecs / stats.balanceTotalSecs) * 100);
+
+        let overall = Math.round((gatheringPct + syncPct + balancePct) / 3);
+
+        document.getElementById("score-percentage").innerText = `${overall}%`;
+        
+        document.getElementById("stat-gathering").innerText = `${gatheringPct}%`;
+        document.getElementById("bar-gathering").style.width = `${gatheringPct}%`;
+        
+        document.getElementById("stat-sync").innerText = `${syncPct}%`;
+        document.getElementById("bar-sync").style.width = `${syncPct}%`;
+        
+        document.getElementById("stat-balance").innerText = `${balancePct}%`;
+        document.getElementById("bar-balance").style.width = `${balancePct}%`;
+
+        let archTitle = "Chaotic Kitchen Duo";
+        if (overall > 85) archTitle = "Perfect Rhythm Partners";
+        else if (overall > 65) archTitle = "Balanced Bakers";
+        else if (overall > 40) archTitle = "The Messy Masterminds";
+        
+        document.getElementById("archetype-title").innerText = archTitle;
+    }
+
+    function resetSetup() {
+        location.reload();
+    }
+
+    function shareResults() {
+        let text = `🧁 Cozy Kitchen Results 🧁\nOur Compatibility: ${document.getElementById("score-percentage").innerText}\nArchetype: ${document.getElementById("archetype-title").innerText}\nCan you beat us?`;
+        navigator.clipboard.writeText(text);
+        alert("Results copied to clipboard!");
+    }
+
+</script>
 </body>
 </html>
