@@ -11,31 +11,32 @@
 <style>
 body {
   background: radial-gradient(circle at top, #3a2a27, #1a1110);
-  font-family: 'Segoe UI', sans-serif;
+  font-family: system-ui, sans-serif;
 }
 .glass {
   background: rgba(255,255,255,0.08);
   backdrop-filter: blur(12px);
+}
+canvas {
+  background: radial-gradient(circle, #2d1b17, #140a08);
 }
 </style>
 </head>
 
 <body class="min-h-screen flex items-center justify-center text-white">
 
+<!-- LOBBY -->
 <div id="lobby" class="glass p-8 rounded-2xl w-[340px] text-center shadow-2xl">
   <h1 class="text-4xl mb-6">🍰 Cozy Kitchen</h1>
 
-  <!-- MODE -->
-  <div id="mode" class="space-y-3">
+  <div class="space-y-3">
     <button id="hostBtn" class="w-full py-3 bg-orange-500 rounded-xl font-bold">Host Game</button>
     <button id="joinBtn" class="w-full py-3 bg-teal-500 rounded-xl font-bold">Join Game</button>
   </div>
 
-  <!-- JOIN -->
   <input id="roomInput" class="hidden w-full mt-4 p-3 rounded-xl text-black"
-         placeholder="Paste Room Code">
+         placeholder="Room Code">
 
-  <!-- NAME -->
   <input id="nameInput" class="w-full mt-4 p-3 rounded-xl text-black"
          placeholder="Your Name">
 
@@ -52,32 +53,41 @@ body {
   </button>
 </div>
 
-<canvas id="game" width="800" height="500" class="hidden"></canvas>
+<!-- GAME -->
+<canvas id="game" width="900" height="500" class="hidden rounded-xl shadow-2xl"></canvas>
 
 <script>
+/* ---------- STATE ---------- */
 let peer, conn
 let isHost = false
 let localReady = false
 let remoteReady = false
 let started = false
-let myName = ""
+let myName = "Player"
 
-const status = document.getElementById("status")
-const readyBtn = document.getElementById("readyBtn")
 const lobby = document.getElementById("lobby")
 const canvas = document.getElementById("game")
 const ctx = canvas.getContext("2d")
+const status = document.getElementById("status")
+const readyBtn = document.getElementById("readyBtn")
 
+/* ---------- PLAYERS ---------- */
+const me = { x: 200, y: 250, emoji: "🦊" }
+const other = { x: 700, y: 250, emoji: "🐰" }
+const speed = 4
+const keys = {}
+
+/* ---------- UI ---------- */
 hostBtn.onclick = () => {
   isHost = true
   roomInput.classList.add("hidden")
-  status.innerText = "Hosting a new room"
+  status.innerText = "Hosting game..."
 }
 
 joinBtn.onclick = () => {
   isHost = false
   roomInput.classList.remove("hidden")
-  status.innerText = "Joining a room"
+  status.innerText = "Joining game..."
 }
 
 continueBtn.onclick = () => {
@@ -85,12 +95,13 @@ continueBtn.onclick = () => {
   initPeer()
 }
 
+/* ---------- PEER ---------- */
 function initPeer() {
   peer = new Peer()
 
   peer.on("open", id => {
     if (isHost) {
-      status.innerText = `Room Code: ${id}`
+      status.innerText = "Room Code: " + id
     } else {
       conn = peer.connect(roomInput.value.trim())
       setupConn()
@@ -109,22 +120,22 @@ function setupConn() {
   conn.on("open", () => {
     status.innerText = "Connected — press READY"
     readyBtn.classList.remove("hidden")
-    conn.send({ type: "NAME", name: myName })
   })
 
   conn.on("data", msg => {
-    if (msg.type === "NAME") {
-      status.innerText = `${msg.name} connected`
-    }
     if (msg.type === "READY") {
       remoteReady = true
-      status.innerText = "Partner is ready"
       checkStart()
     }
     if (msg.type === "START") startGame()
+    if (msg.type === "MOVE") {
+      other.x = msg.x
+      other.y = msg.y
+    }
   })
 }
 
+/* ---------- READY ---------- */
 readyBtn.onclick = () => {
   localReady = true
   readyBtn.disabled = true
@@ -140,21 +151,49 @@ function checkStart() {
   }
 }
 
+/* ---------- GAME ---------- */
 function startGame() {
   if (started) return
   started = true
+
   lobby.classList.add("hidden")
   canvas.classList.remove("hidden")
+
+  me.emoji = isHost ? "🦊" : "🐰"
+  other.emoji = isHost ? "🐰" : "🦊"
+
+  requestAnimationFrame(gameLoop)
+}
+
+function gameLoop() {
+  update()
   draw()
+  requestAnimationFrame(gameLoop)
+}
+
+function update() {
+  if (keys["ArrowUp"]) me.y -= speed
+  if (keys["ArrowDown"]) me.y += speed
+  if (keys["ArrowLeft"]) me.x -= speed
+  if (keys["ArrowRight"]) me.x += speed
+
+  conn?.send({ type: "MOVE", x: me.x, y: me.y })
 }
 
 function draw() {
-  ctx.clearRect(0,0,800,500)
-  ctx.font = "60px sans-serif"
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  ctx.font = "60px serif"
   ctx.textAlign = "center"
-  ctx.fillText(isHost ? "🦊" : "🐰", 400, 250)
-  requestAnimationFrame(draw)
+  ctx.textBaseline = "middle"
+
+  ctx.fillText(me.emoji, me.x, me.y)
+  ctx.fillText(other.emoji, other.x, other.y)
 }
+
+/* ---------- INPUT ---------- */
+window.addEventListener("keydown", e => keys[e.key] = true)
+window.addEventListener("keyup", e => keys[e.key] = false)
 </script>
 
 </body>
